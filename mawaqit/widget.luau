@@ -17,4 +17,26 @@ function M.buildTree(cd, cfg, isVertical)
   return ui.row({ gap = 6, align = "center" }, { glyph, label })
 end
 
+local function readCfg()
+  return { textColor = noctalia.getConfig("textColor") or "none",
+           iconColor = noctalia.getConfig("iconColor") or "none",
+           activeColor = noctalia.getConfig("activeColor") or "primary" }
+end
+
+function M._start()
+  local function render()
+    local cd = noctalia.state.get("countdown") or { text = "…", glyph = "building-mosque", mode = "loading", color = "primary" }
+    barWidget.render(M.buildTree(cd, readCfg(), barWidget.isVertical()))
+    if cd.label and cd.next then barWidget.setTooltip(cd.label .. ": " .. (cd.text or "")) end
+  end
+  noctalia.state.watch("countdown", render)
+  noctalia.state.watch("status", render)
+  render()
+end
+
+function onClick()
+  noctalia.togglePanel("aalbayaty/mawaqit:panel")
+end
+
 if _G.__MAWAQIT_TEST or noctalia == nil then return M end
+M._start()
