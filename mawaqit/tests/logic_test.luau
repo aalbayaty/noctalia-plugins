@@ -204,4 +204,41 @@ H.test("upcomingEvent nothing upcoming -> nil", function()
   H.eq(M.upcomingEvent(2, 20, 3), nil, "no event within range")
 end)
 
+-- ── Task 6.1: M.buildCalendar (service-side Hijri calendar grid builder) ────
+H.test("buildCalendar estimated month (no calData): anchors on today, marks event + today cell", function()
+  local hijriCtx = { todayJDN = M.toJDN(2026, 7, 16), hijriDay = 1, hijriMonth = 1, hijriYear = 1448, hijriDayOffset = 0 }
+  local cal = M.buildCalendar(1, 1448, hijriCtx, nil, { weekStartDay = 1 })
+  H.eq(#cal.cells, M.estimateMonthLength(1, 1448), "cell count matches estimated month length")
+  H.eq(cal.leadingBlanks, M.weekdayColumn(hijriCtx.todayJDN, 1), "leadingBlanks anchors on today's JDN")
+  H.eq(cal.synced, false, "no calData -> unsynced/estimated")
+  H.eq(cal.monthNameEn, "Muharram", "hijri month name")
+  H.eq(cal.weekStartDay, 1, "weekStartDay carried through")
+  H.truthy(cal.cells[1].isToday, "day 1 (Muharram 1) is today")
+  H.truthy(cal.cells[10].eventAr, "day 10 (Ashura) carries an eventAr")
+  H.truthy(cal.cells[2].isFriday, "day 2 (17 Jul 2026, a Friday) flagged isFriday")
+end)
+
+H.test("buildCalendar with calData: synced, gday overlay from apiIdx, gregRange spans months", function()
+  local hijriCtx = { todayJDN = M.toJDN(2026, 7, 16), hijriDay = 1, hijriMonth = 1, hijriYear = 1448, hijriDayOffset = 0 }
+  local calData = {}
+  for i = 1, 30 do
+    calData[i] = { gregorian = { day = tostring(15 + i), month = { en = (i <= 16) and "Jul" or "Aug" }, year = "2026" } }
+  end
+  local cal = M.buildCalendar(1, 1448, hijriCtx, calData, { weekStartDay = 1, syncedAt = "16 Jul, 08:00" })
+  H.eq(#cal.cells, 30, "cell count matches calData length")
+  H.eq(cal.synced, true, "calData present -> synced")
+  H.eq(cal.syncedAt, "16 Jul, 08:00", "syncedAt passed through")
+  H.eq(cal.cells[1].gday, "16", "day1 gregorian overlay from calData[1] (apiIdx = 0 with offset 0)")
+  H.ok(cal.gregRange:find("Jul") ~= nil and cal.gregRange:find("Aug") ~= nil, "gregRange spans Jul-Aug")
+end)
+
+H.test("buildCalendar steps to an adjacent (non-current) month via estimated lengths", function()
+  local hijriCtx = { todayJDN = M.toJDN(2026, 7, 16), hijriDay = 1, hijriMonth = 1, hijriYear = 1448, hijriDayOffset = 0 }
+  local cal = M.buildCalendar(2, 1448, hijriCtx, nil, { weekStartDay = 1 })
+  local expectedFirstJDN = hijriCtx.todayJDN + M.estimateMonthLength(1, 1448)
+  H.eq(cal.leadingBlanks, M.weekdayColumn(expectedFirstJDN, 1), "Safar anchors right after Muharram's estimated length")
+  H.eq(#cal.cells, M.estimateMonthLength(2, 1448), "Safar cell count")
+  H.eq(cal.cells[1].isToday, false, "viewing a non-current month -> no isToday")
+end)
+
 H.finish()

@@ -531,6 +531,125 @@ M.MONTH_NAMES_EN = { "Muharram", "Safar", "Rabi al-Awwal", "Rabi ath-Thani", "Ju
 M.MONTH_NAMES_AR = { "محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى",
   "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة" }
 
+-- ── Task 6.1: Hijri calendar grid builder ───────────────────────────────────
+-- Ported from /tmp/legacy-v4-plugins/mawaqit/Panel.qml's calItem (updateGrid,
+-- navigate, fetchCalendar's grid consumers, ~L546-675).
+
+-- English Gregorian month abbreviations, for the gregRange label when no API
+-- calData is available yet (estimating from JDN math alone). Mirrors the keys
+-- of MONTH_ABBR above (same three-letter forms), just inverted to an array.
+local GREG_MONTH_NAMES_EN = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
+
+-- Any JDN with JDN % 7 == 4 is a Friday (a fixed property of the Julian Day
+-- Number system, independent of weekStartDay) — reusing the tested
+-- M.weekdayColumn on jdn=4 gives "which display column is Friday" without
+-- re-deriving the (weekStartDay+6)%7 offset math a second time.
+local function fridayColumn(weekStartDay)
+  return M.weekdayColumn(4, weekStartDay)
+end
+
+-- Walks from hijriCtx's anchor month (the Hijri month containing `todayJDN`)
+-- to (month, year), one Hijri month at a time, accumulating/subtracting
+-- M.estimateMonthLength lengths — mirrors v4 calItem.navigate()'s jdn
+-- bookkeeping (`jdn += getDaysInMonth(m,y); m++` forward / `m--; jdn -=
+-- getDaysInMonth(m,y)` backward).
+local function firstJDNFor(month, year, hijriCtx)
+  local jdn = hijriCtx.todayJDN - (hijriCtx.hijriDay - 1)
+  local m, y = hijriCtx.hijriMonth, hijriCtx.hijriYear
+  while not (m == month and y == year) do
+    if (y < year) or (y == year and m < month) then
+      jdn = jdn + M.estimateMonthLength(m, y)
+      m = m + 1
+      if m > 12 then m = 1; y = y + 1 end
+    else
+      m = m - 1
+      if m < 1 then m = 12; y = y - 1 end
+      jdn = jdn - M.estimateMonthLength(m, y)
+    end
+  end
+  return jdn
+end
+
+-- M.buildCalendar(month, year, hijriCtx, calData, cfg) -> calendar state shape
+-- { month, year, monthNameEn, synced, syncedAt, gregRange, weekStartDay,
+--   leadingBlanks, cells: {{ hday, gday, isToday, isPast, isFriday, eventAr }} }
+-- hijriCtx = { todayJDN, hijriDay, hijriMonth, hijriYear, hijriDayOffset }.
+-- calData = decoded hToGCalendar `data` array, or nil to estimate from JDN math.
+-- cfg = { weekStartDay, syncedAt?, hijriDayOffset? } (hijriDayOffset here is a
+-- fallback only — hijriCtx.hijriDayOffset is the primary source, per the
+-- documented hijriCtx shape).
+function M.buildCalendar(month, year, hijriCtx, calData, cfg)
+  cfg = cfg or {}
+  hijriCtx = hijriCtx or {}
+  local weekStartDay = cfg.weekStartDay or 1
+  local hijriDayOffset = hijriCtx.hijriDayOffset or cfg.hijriDayOffset or 0
+  local isCurrentMonth = (month == hijriCtx.hijriMonth) and (year == hijriCtx.hijriYear)
+  local synced = calData ~= nil
+
+  local firstJDN = firstJDNFor(month, year, hijriCtx)
+  local leadingBlanks = M.weekdayColumn(firstJDN, weekStartDay)
+  local fridayCol = fridayColumn(weekStartDay)
+  local days = synced and #calData or M.estimateMonthLength(month, year)
+
+  local cells = {}
+  for d = 1, days do
+    local jdn = firstJDN + d - 1
+    local wd = M.weekdayColumn(jdn, weekStartDay)
+    local gday = nil
+    if synced then
+      local apiIdx = d - 1 - hijriDayOffset -- 0-based, per v4
+      local item = (apiIdx >= 0 and apiIdx < #calData) and calData[apiIdx + 1] or nil
+      gday = item and item.gregorian and item.gregorian.day or nil
+    else
+      local _, _, gd = M.jdnToGreg(jdn)
+      gday = gd
+    end
+    local ev = M.eventsFor(month, d)
+    table.insert(cells, {
+      hday = d,
+      gday = gday,
+      isToday = isCurrentMonth and d == hijriCtx.hijriDay,
+      isPast = isCurrentMonth and d < hijriCtx.hijriDay,
+      isFriday = wd == fridayCol,
+      eventAr = ev and ev.ar or nil,
+    })
+  end
+
+  local gregRange = ""
+  if synced and #calData > 0 then
+    local f, l = calData[1].gregorian, calData[#calData].gregorian
+    if f and l then
+      local fMonth = (f.month and f.month.en) or ""
+      local lMonth = (l.month and l.month.en) or ""
+      if fMonth == lMonth then
+        gregRange = fMonth .. " " .. tostring(f.year)
+      else
+        gregRange = fMonth .. " – " .. lMonth .. " " .. tostring(l.year)
+      end
+    end
+  else
+    local fy, fm = M.jdnToGreg(firstJDN)
+    local ly, lm = M.jdnToGreg(firstJDN + days - 1)
+    if fm == lm and fy == ly then
+      gregRange = GREG_MONTH_NAMES_EN[fm] .. " " .. fy
+    else
+      gregRange = GREG_MONTH_NAMES_EN[fm] .. " – " .. GREG_MONTH_NAMES_EN[lm] .. " " .. ly
+    end
+  end
+
+  return {
+    month = month,
+    year = year,
+    monthNameEn = M.MONTH_NAMES_EN[month] or "",
+    synced = synced,
+    syncedAt = cfg.syncedAt,
+    gregRange = gregRange,
+    weekStartDay = weekStartDay,
+    leadingBlanks = leadingBlanks,
+    cells = cells,
+  }
+end
+
 -- ── Task 3.1: Config reader ──────────────────────────────────────────────────
 
 local function cfgStr(key, default) local v = noctalia.getConfig(key); if v == nil then return default end; return v end
