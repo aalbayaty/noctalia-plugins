@@ -1,0 +1,264 @@
+id = "aalbayaty/mawaqit"
+name = "Mawaqit"
+version = "2.0.0"
+min_noctalia = "5.0.0"
+author = "aalbayaty"
+license = "MIT"
+icon = "building-mosque"
+description = "Prayer times with a live countdown and a Hijri calendar with Islamic events."
+dependencies = []
+tags = ["Bar", "Panel", "Islam", "Prayer"]
+
+[[service]]
+id = "scheduler"
+entry = "service.luau"
+
+[[widget]]
+id = "bar"
+entry = "widget.luau"
+
+[[panel]]
+id = "panel"
+entry = "panel.luau"
+width = 360
+height = 640
+placement = "floating"
+position = "center"
+
+# ── Location ──────────────────────────────────────────────
+[[setting]]
+key = "city"
+type = "string"
+label_key = "settings.city.label"
+description_key = "settings.city.description"
+default = "London"
+
+[[setting]]
+key = "country"
+type = "string"
+label_key = "settings.country.label"
+description_key = "settings.country.description"
+default = "UK"
+
+[[setting]]
+key = "method"
+type = "select"
+label_key = "settings.method.label"
+description_key = "settings.method.description"
+default = "3"
+options = [
+  { value = "1",  label_key = "settings.method.opt.1" },
+  { value = "2",  label_key = "settings.method.opt.2" },
+  { value = "3",  label_key = "settings.method.opt.3" },
+  { value = "4",  label_key = "settings.method.opt.4" },
+  { value = "5",  label_key = "settings.method.opt.5" },
+  { value = "7",  label_key = "settings.method.opt.7" },
+  { value = "8",  label_key = "settings.method.opt.8" },
+  { value = "9",  label_key = "settings.method.opt.9" },
+  { value = "10", label_key = "settings.method.opt.10" },
+  { value = "11", label_key = "settings.method.opt.11" },
+  { value = "12", label_key = "settings.method.opt.12" },
+  { value = "13", label_key = "settings.method.opt.13" },
+  { value = "14", label_key = "settings.method.opt.14" },
+  { value = "15", label_key = "settings.method.opt.15" },
+  { value = "16", label_key = "settings.method.opt.16" },
+  { value = "19", label_key = "settings.method.opt.19" },
+  { value = "23", label_key = "settings.method.opt.23" },
+  { value = "99", label_key = "settings.method.opt.99" },
+]
+
+[[setting]]
+key = "fajrAngle"
+type = "string"
+label_key = "settings.fajrAngle.label"
+description_key = "settings.fajrAngle.description"
+default = ""
+visible_when = { key = "method", values = ["99"] }
+
+[[setting]]
+key = "ishaAngle"
+type = "string"
+label_key = "settings.ishaAngle.label"
+description_key = "settings.ishaAngle.description"
+default = ""
+visible_when = { key = "method", values = ["99"] }
+
+[[setting]]
+key = "school"
+type = "select"
+label_key = "settings.school.label"
+description_key = "settings.school.description"
+default = "0"
+options = [
+  { value = "0", label_key = "settings.school.opt.0" },
+  { value = "1", label_key = "settings.school.opt.1" },
+]
+
+# ── Calibration ───────────────────────────────────────────
+[[setting]]
+key = "hijriDayOffset"
+type = "select"
+label_key = "settings.hijriDayOffset.label"
+description_key = "settings.hijriDayOffset.description"
+default = "0"
+options = [
+  { value = "-1", label_key = "settings.hijriDayOffset.opt.-1" },
+  { value = "0",  label_key = "settings.hijriDayOffset.opt.0" },
+  { value = "1",  label_key = "settings.hijriDayOffset.opt.1" },
+]
+
+[[setting]]
+key = "weekStartDay"
+type = "select"
+label_key = "settings.weekStartDay.label"
+description_key = "settings.weekStartDay.description"
+default = "1"
+options = [
+  { value = "6", label_key = "settings.weekStartDay.opt.6" },
+  { value = "0", label_key = "settings.weekStartDay.opt.0" },
+  { value = "1", label_key = "settings.weekStartDay.opt.1" },
+]
+
+[[setting]]
+key = "tune"
+type = "bool"
+label_key = "settings.tune.label"
+description_key = "settings.tune.description"
+default = false
+
+[[setting]]
+key = "tuneFajr"
+type = "int"
+label_key = "settings.tune.fajr"
+default = 0
+min = -60
+max = 60
+visible_when = { key = "tune", values = ["true"] }
+
+[[setting]]
+key = "tuneDhuhr"
+type = "int"
+label_key = "settings.tune.dhuhr"
+default = 0
+min = -60
+max = 60
+visible_when = { key = "tune", values = ["true"] }
+
+[[setting]]
+key = "tuneAsr"
+type = "int"
+label_key = "settings.tune.asr"
+default = 0
+min = -60
+max = 60
+visible_when = { key = "tune", values = ["true"] }
+
+[[setting]]
+key = "tuneMaghrib"
+type = "int"
+label_key = "settings.tune.maghrib"
+default = 0
+min = -60
+max = 60
+visible_when = { key = "tune", values = ["true"] }
+
+[[setting]]
+key = "tuneIsha"
+type = "int"
+label_key = "settings.tune.isha"
+default = 0
+min = -60
+max = 60
+visible_when = { key = "tune", values = ["true"] }
+
+# ── Display ───────────────────────────────────────────────
+[[setting]]
+key = "showCountdown"
+type = "bool"
+label_key = "settings.showCountdown.label"
+description_key = "settings.showCountdown.description"
+default = true
+
+[[setting]]
+key = "showElapsed"
+type = "bool"
+label_key = "settings.showElapsed.label"
+description_key = "settings.showElapsed.description"
+default = false
+
+[[setting]]
+key = "hidePrayerName"
+type = "bool"
+label_key = "settings.hidePrayerName.label"
+description_key = "settings.hidePrayerName.description"
+default = false
+
+[[setting]]
+key = "use12hourFormat"
+type = "bool"
+label_key = "settings.use12hourFormat.label"
+description_key = "settings.use12hourFormat.description"
+default = false
+
+# ── Styling ───────────────────────────────────────────────
+[[setting]]
+key = "widgetIcon"
+type = "glyph"
+label_key = "settings.widgetIcon.label"
+description_key = "settings.widgetIcon.description"
+default = "building-mosque"
+
+[[setting]]
+key = "dynamicIcon"
+type = "bool"
+label_key = "settings.dynamicIcon.label"
+description_key = "settings.dynamicIcon.description"
+default = false
+
+[[setting]]
+key = "textColor"
+type = "select"
+label_key = "settings.textColor.label"
+default = "none"
+options = [
+  { value = "none",      label_key = "settings.color.none" },
+  { value = "primary",   label_key = "settings.color.primary" },
+  { value = "secondary", label_key = "settings.color.secondary" },
+  { value = "tertiary",  label_key = "settings.color.tertiary" },
+  { value = "error",     label_key = "settings.color.error" },
+]
+
+[[setting]]
+key = "iconColor"
+type = "select"
+label_key = "settings.iconColor.label"
+default = "none"
+options = [
+  { value = "none",      label_key = "settings.color.none" },
+  { value = "primary",   label_key = "settings.color.primary" },
+  { value = "secondary", label_key = "settings.color.secondary" },
+  { value = "tertiary",  label_key = "settings.color.tertiary" },
+  { value = "error",     label_key = "settings.color.error" },
+]
+
+[[setting]]
+key = "activeColor"
+type = "select"
+label_key = "settings.activeColor.label"
+description_key = "settings.activeColor.description"
+default = "primary"
+options = [
+  { value = "none",      label_key = "settings.color.none" },
+  { value = "primary",   label_key = "settings.color.primary" },
+  { value = "secondary", label_key = "settings.color.secondary" },
+  { value = "tertiary",  label_key = "settings.color.tertiary" },
+  { value = "error",     label_key = "settings.color.error" },
+]
+
+# ── Notifications ─────────────────────────────────────────
+[[setting]]
+key = "showNotifications"
+type = "bool"
+label_key = "settings.showNotifications.label"
+description_key = "settings.notifications.description"
+default = true
