@@ -61,4 +61,57 @@ function M.buildCountdownCard(countdown, isRamadan)
   })
 end
 
+-- ── Task 5.3: Prayer list + hint banner + status/error ───────────────────────
+
+-- The panel can't `require` service.luau (sandbox has no `require`), so this
+-- tiny prayer→glyph map is intentionally duplicated from service.luau's
+-- `M.PRAYER_GLYPHS` — keep the two in sync by hand if prayer keys/icons change.
+local PRAYER_GLYPHS = { Imsak = "moon", Fajr = "sun-moon", Sunrise = "sunrise", Dhuhr = "sun-high",
+  Asr = "sun-low", Maghrib = "sunset", Isha = "moon-stars" }
+
+function M.rowGlyph(key)
+  return PRAYER_GLYPHS[key] or "building-mosque"
+end
+
+local function rowFill(highlight)
+  if highlight == "next" then return "primary/0.15" end
+  if highlight == "imsak" then return "secondary/0.08" end
+  if highlight == "maghrib" then return "tertiary/0.08" end
+  return "surface_variant"
+end
+
+function M.buildPrayerList(prayers)
+  local rows = {}
+  for _, p in ipairs(prayers or {}) do
+    table.insert(rows, ui.row({ fill = rowFill(p.highlight), gap = 8, align = "center" }, {
+      ui.glyph({ name = M.rowGlyph(p.key) }),
+      ui.label({ text = p.label }),
+      ui.spacer(),
+      ui.label({ text = p.time or "—" }),
+    }))
+  end
+  return ui.column({ gap = 6 }, rows)
+end
+
+function M.buildHint(event)
+  if event == nil then return ui.spacer() end
+  return ui.box({ fill = "tertiary/0.10", radius = 8 }, {
+    ui.row({ justify = "space_between", align = "center" }, {
+      ui.label({ text = event.whenText or "", color = "tertiary" }),
+      ui.label({ text = event.nameAr or "", color = "tertiary", fontFamily = M.FONT }),
+    }),
+  })
+end
+
+function M.buildStatus(status, err)
+  if status == "loading" then
+    return ui.row({ align = "center", gap = 6 }, { ui.progress({ indeterminate = true }), ui.label({ text = noctalia.tr("calendar.syncing") }) })
+  end
+  if status == "error" then
+    local text = (err ~= nil and err ~= "") and err or noctalia.tr("error.generic")
+    return ui.label({ text = text, color = "error" })
+  end
+  return ui.spacer()
+end
+
 if _G.__MAWAQIT_TEST or noctalia == nil then return M end
