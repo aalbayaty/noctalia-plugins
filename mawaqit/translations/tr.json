@@ -1,0 +1,53 @@
+{
+  "menu": { "openPanel": "Namaz Vakitlerini Aç", "settings": "Widget Ayarları" },
+  "widget": { "soon": "yakında", "now": "Şimdi", "tooltip": { "noData": "Namaz verileri yüklenmedi", "countdown": "Kalan süre" } },
+  "panel": {
+    "title": "Namaz Vakitleri", "refresh": "Yenile", "close": "Kapat",
+    "configure": "Namaz vakitlerini yüklemek için ayarlardan şehrinizi belirleyin.",
+    "now": "Şimdi", "jumuah": "Cuma", "today": "Bugün", "tomorrow": "Yarın",
+    "inDays": { "one": "{count} gün sonra", "other": "{count} gün sonra" },
+    "imsak": "İmsak", "fajr": "Sabah", "sunrise": "Güneş", "dhuhr": "Öğle",
+    "asr": "İkindi", "maghrib": "Akşam", "isha": "Yatsı",
+    "tab": { "prayers": "Namaz Vakitleri", "calendar": "Takvim" }
+  },
+  "calendar": {
+    "today": "Bugüne dön", "refresh": "Yenile", "syncing": "Senkronize ediliyor…",
+    "sync": "Senkron: {date}", "approximate": "Tahmini (API ile senkronize değil)",
+    "weekday": { "mo": "Pt", "tu": "Sa", "we": "Ça", "th": "Pe", "fr": "Cu", "sa": "Ct", "su": "Pz" }
+  },
+  "error": { "network": "Ağ hatası", "generic": "Namaz vakitleri yüklenemedi" },
+  "settings": {
+    "city": { "label": "Şehir", "description": "Namaz vakti sorgusu için şehir adı." },
+    "country": { "label": "Ülke", "description": "Ülke adı veya ISO kodu." },
+    "method": { "label": "Hesaplama Yöntemi", "description": "Namaz vakti hesaplama otoritesi.",
+      "opt": { "1": "Karaçi İslami Bilimler Üniversitesi", "2": "ISNA (Kuzey Amerika)",
+        "3": "Dünya İslam Birliği", "4": "Ümmü'l-Kura, Mekke", "5": "Mısır Genel Otoritesi",
+        "7": "Jeofizik Enstitüsü, Tahran", "8": "Körfez Bölgesi", "9": "Kuveyt", "10": "Katar",
+        "11": "Singapur (MUIS)", "12": "UOIF (Fransa)", "13": "Diyanet (Türkiye)", "14": "Rusya",
+        "15": "Hilal Gözlem Komitesi", "16": "Dubai (Deneysel)", "19": "Cezayir",
+        "23": "Ürdün (Evkaf)", "99": "Özel (aşağıdaki açılar)" } },
+    "fajrAngle": { "label": "Fecir Açısı", "description": "Özel Fecir güneş açısı (yöntem = Özel)." },
+    "ishaAngle": { "label": "Yatsı Açısı", "description": "Özel Yatsı güneş açısı (yöntem = Özel)." },
+    "school": { "label": "Asr Mezhebi", "description": "İkindi için gölge faktörü.",
+      "opt": { "0": "Şafi / Maliki / Hanbeli", "1": "Hanefi" } },
+    "hijriDayOffset": { "label": "Hicri Gün Ayarı", "description": "Yerel hilal gözlemi için Hicri tarihi kaydır.",
+      "opt": { "-1": "−1 gün", "0": "Varsayılan (API'den)", "1": "+1 gün" } },
+    "weekStartDay": { "label": "Haftanın ilk günü", "description": "Takvim haftasının başlangıcı.",
+      "opt": { "6": "Cumartesi", "0": "Pazar", "1": "Pazartesi" } },
+    "tune": { "label": "Namaz Vakti Kaydırmaları", "description": "Her namazı dakika cinsinden ince ayarla.",
+      "fajr": "Sabah kaydırması (dk)", "dhuhr": "Öğle kaydırması (dk)", "asr": "İkindi kaydırması (dk)",
+      "maghrib": "Akşam kaydırması (dk)", "isha": "Yatsı kaydırması (dk)" },
+    "showCountdown": { "label": "Geri sayımı göster", "description": "Çubukta sabit saat yerine canlı geri sayım göster." },
+    "showElapsed": { "label": "Geçen süreyi göster", "description": "Namazdan sonra bir saate kadar ileri say." },
+    "hidePrayerName": { "label": "Çubukta namaz adını gizle", "description": "Yalnızca saat/geri sayımı göster." },
+    "use12hourFormat": { "label": "12 saat formatı", "description": "24 saat yerine ÖÖ/ÖS kullan." },
+    "widgetIcon": { "label": "Widget simgesi", "description": "Çubuk simge glifi." },
+    "dynamicIcon": { "label": "Dinamik namaz simgesi", "description": "Çubuk simgesi bir sonraki/son namazı takip eder." },
+    "textColor": { "label": "Çubuk metin rengi" },
+    "iconColor": { "label": "Çubuk simge rengi" },
+    "activeColor": { "label": "Aktif renk", "description": "Şimdi/Geçen sırasında çubuk rengi." },
+    "color": { "none": "Varsayılan", "primary": "Birincil", "secondary": "İkincil", "tertiary": "Üçüncül", "error": "Hata" },
+    "showNotifications": { "label": "Namaz bildirimleri" },
+    "notifications": { "description": "Her namaz vaktinde masaüstü bildirimi gönder." }
+  }
+}

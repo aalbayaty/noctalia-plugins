@@ -1,0 +1,53 @@
+{
+  "menu": { "openPanel": "Ouvrir les Temps de Prières", "settings": "Paramètres du Widget" },
+  "widget": { "soon": "bientôt", "now": "Maintenant", "tooltip": { "noData": "Données des prières non chargées", "countdown": "Temps restant" } },
+  "panel": {
+    "title": "Temps des Prières", "refresh": "Rafraîchir", "close": "Fermer",
+    "configure": "Configurez votre ville dans les paramètres pour charger les temps de prière.",
+    "now": "Maintenant", "jumuah": "Jumu'ah", "today": "Aujourd'hui", "tomorrow": "Demain",
+    "inDays": { "one": "dans {count} jour", "other": "dans {count} jours" },
+    "imsak": "Imsak", "fajr": "Fajr", "sunrise": "Lever du soleil", "dhuhr": "Dhuhr",
+    "asr": "Asr", "maghrib": "Maghrib", "isha": "Isha",
+    "tab": { "prayers": "Temps des Prières", "calendar": "Calendrier" }
+  },
+  "calendar": {
+    "today": "Retour à aujourd'hui", "refresh": "Rafraîchir", "syncing": "Synchronisation…",
+    "sync": "Synchro : {date}", "approximate": "Estimation (non synchronisée avec l'API)",
+    "weekday": { "mo": "Lu", "tu": "Ma", "we": "Me", "th": "Je", "fr": "Ve", "sa": "Sa", "su": "Di" }
+  },
+  "error": { "network": "Erreur réseau", "generic": "Impossible de charger les temps de prière" },
+  "settings": {
+    "city": { "label": "Ville", "description": "Nom de la ville pour la recherche des temps de prière." },
+    "country": { "label": "Pays", "description": "Nom du pays ou code ISO." },
+    "method": { "label": "Méthode de calcul", "description": "Autorité de calcul des temps de prière.",
+      "opt": { "1": "Université des Sciences Islamiques, Karachi", "2": "ISNA (Amérique du Nord)",
+        "3": "Ligue Islamique Mondiale", "4": "Umm Al-Qura, La Mecque", "5": "Autorité Générale Égyptienne",
+        "7": "Institut de Géophysique, Téhéran", "8": "Région du Golfe", "9": "Koweït", "10": "Qatar",
+        "11": "Singapour (MUIS)", "12": "UOIF (France)", "13": "Diyanet (Turquie)", "14": "Russie",
+        "15": "Comité d'observation de la lune", "16": "Dubaï (Expérimental)", "19": "Algérie",
+        "23": "Jordanie (Awqaf)", "99": "Personnalisée (angles ci-dessous)" } },
+    "fajrAngle": { "label": "Angle du Fajr", "description": "Angle solaire personnalisé du Fajr (méthode = Personnalisée)." },
+    "ishaAngle": { "label": "Angle de l'Isha", "description": "Angle solaire personnalisé de l'Isha (méthode = Personnalisée)." },
+    "school": { "label": "École de l'Asr", "description": "Facteur d'ombre utilisé pour l'Asr.",
+      "opt": { "0": "Shafi / Maliki / Hanbali", "1": "Hanafi" } },
+    "hijriDayOffset": { "label": "Ajustement du jour Hijri", "description": "Décale la date Hijri pour l'observation locale de la lune.",
+      "opt": { "-1": "−1 jour", "0": "Par défaut (depuis l'API)", "1": "+1 jour" } },
+    "weekStartDay": { "label": "Premier jour de la semaine", "description": "Début de la semaine du calendrier.",
+      "opt": { "6": "Samedi", "0": "Dimanche", "1": "Lundi" } },
+    "tune": { "label": "Décalages des temps de prière", "description": "Ajuster chaque prière en minutes.",
+      "fajr": "Décalage Fajr (min)", "dhuhr": "Décalage Dhuhr (min)", "asr": "Décalage Asr (min)",
+      "maghrib": "Décalage Maghrib (min)", "isha": "Décalage Isha (min)" },
+    "showCountdown": { "label": "Afficher le compte à rebours", "description": "La barre affiche un compte à rebours en direct au lieu de l'heure statique." },
+    "showElapsed": { "label": "Afficher le temps écoulé", "description": "Compter en avant jusqu'à une heure après une prière." },
+    "hidePrayerName": { "label": "Masquer le nom de la prière dans la barre", "description": "N'afficher que l'heure/le compte à rebours." },
+    "use12hourFormat": { "label": "Format 12 heures", "description": "Utiliser AM/PM au lieu du format 24 heures." },
+    "widgetIcon": { "label": "Icône du widget", "description": "Glyphe de l'icône de la barre." },
+    "dynamicIcon": { "label": "Icône de prière dynamique", "description": "L'icône de la barre suit la prochaine/dernière prière." },
+    "textColor": { "label": "Couleur du texte de la barre" },
+    "iconColor": { "label": "Couleur de l'icône de la barre" },
+    "activeColor": { "label": "Couleur active", "description": "Couleur de la barre pendant Maintenant/Écoulé." },
+    "color": { "none": "Par défaut", "primary": "Primaire", "secondary": "Secondaire", "tertiary": "Tertiaire", "error": "Erreur" },
+    "showNotifications": { "label": "Notifications de prière" },
+    "notifications": { "description": "Envoyer une notification de bureau à chaque temps de prière." }
+  }
+}
