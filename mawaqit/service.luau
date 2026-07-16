@@ -490,4 +490,40 @@ function M.upcomingEvent(hmonth, hday, gregWeekday, hyear)
   return { daysAhead = best.daysAway, nameAr = best.name }
 end
 
+-- ── Task 2.7 (remainder): methods + month-name constants ───────────────────
+
+-- Ported verbatim from /tmp/legacy-v4-plugins/mawaqit/Settings.qml `methods` combo (~L11-30).
+M.METHODS = {
+  ["1"] = "University of Islamic Sciences, Karachi",
+  ["2"] = "Islamic Society of North America (ISNA)",
+  ["3"] = "Muslim World League (MWL)",
+  ["4"] = "Umm Al-Qura University, Makkah",
+  ["5"] = "Egyptian General Authority of Survey",
+  ["7"] = "Institute of Geophysics, Tehran",
+  ["8"] = "Gulf Region",
+  ["9"] = "Kuwait",
+  ["10"] = "Qatar",
+  ["11"] = "Majlis Ugama Islam Singapura",
+  ["12"] = "Union Organization Islamic de France",
+  ["13"] = "Diyanet İşleri Başkanlığı, Turkey",
+  ["14"] = "Spiritual Administration of Muslims of Russia",
+  ["15"] = "Moonsighting Committee Worldwide",
+  ["16"] = "Dubai (Experimental)",
+  ["19"] = "Algeria",
+  ["23"] = "Ministry of Awqaf, Islamic Affairs and Holy Places, Jordan",
+  ["99"] = "Custom Method",
+}
+
+-- Ported verbatim from /tmp/legacy-v4-plugins/mawaqit/Panel.qml `monthNamesEn` (~L584-585).
+M.MONTH_NAMES_EN = { "Muharram", "Safar", "Rabi al-Awwal", "Rabi ath-Thani", "Jumada al-Ula",
+  "Jumada al-Akhira", "Rajab", "Shaban", "Ramadan", "Shawwal", "Dhu al-Qadah", "Dhu al-Hijjah" }
+
+-- NOTE: v4's Panel.qml has no static Arabic month-name array — the Arabic name
+-- is always taken dynamically from the Aladhan API response (hijri.month.ar).
+-- These are the standard canonical Hijri month names, in the same order as
+-- M.MONTH_NAMES_EN, provided for offline/pure-logic use (e.g. calendar nav
+-- when no API data is cached yet).
+M.MONTH_NAMES_AR = { "محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى",
+  "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة" }
+
 if _G.__MAWAQIT_TEST or noctalia == nil then return M end
