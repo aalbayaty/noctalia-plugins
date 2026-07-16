@@ -1,0 +1,17 @@
+--!nonstrict
+local H = require("./harness")
+local M = H.loadEntry("../service")
+
+H.test("formatTime 24h passthrough", function() H.eq(M.formatTime("13:05", false), "13:05", "24h") end)
+H.test("formatTime 12h pm", function() H.eq(M.formatTime("13:05", true), "1:05 PM", "pm") end)
+H.test("formatTime 12h am + midnight", function()
+  H.eq(M.formatTime("00:07", true), "12:07 AM", "midnight")
+  H.eq(M.formatTime("12:00", true), "12:00 PM", "noon")
+end)
+H.test("toArabicNumerals", function() H.eq(M.toArabicNumerals("1447"), "١٤٤٧", "digits") end)
+H.test("formatCountdownText", function()
+  H.eq(M.formatCountdownText(3725), "1h 2m 5s", "h m s")
+  H.eq(M.formatCountdownText(125), "2m 5s", "m s")
+  H.eq(M.formatCountdownText(9), "9s", "s")
+end)
+H.finish()
