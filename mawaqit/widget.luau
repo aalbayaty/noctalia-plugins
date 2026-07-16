@@ -1,7 +1,10 @@
 --!nonstrict
 local M = {}
 
-local function role(v) if v == nil or v == "" or v == "none" then return "on_surface" end return v end
+local function role(v)
+  if v == nil or v == "" or v == "none" then return "on_surface" end
+  return v
+end
 
 function M.colorRoleFor(cd, cfg, which)
   if cd.mode == "now" or cd.mode == "elapsed" then return role(cfg.activeColor) end
