@@ -76,6 +76,51 @@ H.test("tick does not re-notify the same prayer minute twice in a row", function
   H.eq(#H.calls.notify, 1, "should notify exactly once across repeated ticks at the same minute")
 end)
 
+-- ── Task 6.2: calendar command + fetch/cache ────────────────────────────────
+H.test("calendar command builds synced state via http + writes a cache file", function()
+  -- Seed today's hijri/gregorian context via a normal prayer fetch first
+  -- (mirrors production: the command handler reads M._currentHijriCtx from
+  -- already-published `hijri`/`gregorian` state).
+  H.setHttpReply({ ok = true, status = 200, body = "WEEKLYTOKEN" })
+  H.setDecode(function(s) if s == "WEEKLYTOKEN" then return { code = 200, data = {
+    { date = { gregorian = { date = "16-07-2026" }, readable = "16 Jul 2026",
+      hijri = { day = "1", month = { number = 1, en = "Muharram", ar = "محرم", days = 30 }, year = "1448" } },
+      timings = { Fajr="02:50", Dhuhr="13:05", Asr="17:20", Maghrib="21:07", Isha="23:10" } } } } end return nil end)
+  M._fetch(M._readConfig(), { todayISO = "2026-07-16", nowSec = 8*3600, dayOfYear = 197, gregWeekday = 4 })
+
+  H.setHttpReply({ ok = true, status = 200, body = "CALTOKEN" })
+  H.setDecode(function(s)
+    if s == "CALTOKEN" then
+      local data = {}
+      for d = 1, 30 do
+        data[d] = { gregorian = { day = tostring(15 + d), month = { en = "Jul" }, year = "2026" } }
+      end
+      return { code = 200, data = data }
+    end
+    return nil
+  end)
+  M._installCommandWatch()
+  H.state.set("command", { action = "calendar", month = 1, year = 1448, ts = 2 })
+  local cal = H.state.get("calendar")
+  H.truthy(cal, "calendar state published")
+  H.eq(cal.synced, true, "synced true once http completes")
+  H.truthy(H._fs["/tmp/mawaqit-datadir/cal_1448_1.json"], "cache file written at cal_{y}_{m}.json")
+end)
+
+H.test("calendar command with a cache hit skips http and stays synced", function()
+  H.resetHttpCount()
+  H.state.set("command", { action = "calendar", month = 1, year = 1448, ts = 3 })
+  H.eq(H.httpCount(), 0, "no new http call when the cache is already warm")
+  H.eq(H.state.get("calendar").synced, true, "still synced from cache")
+end)
+
+H.test("calendarRefresh forces a re-fetch even with a warm cache", function()
+  H.resetHttpCount()
+  H.setHttpReply({ ok = true, status = 200, body = "CALTOKEN" })
+  H.state.set("command", { action = "calendarRefresh", month = 1, year = 1448, ts = 4 })
+  H.ok(H.httpCount() >= 1, "calendarRefresh always hits http, bypassing the TTL cache")
+end)
+
 H.test("hijriDisplayAr trims a padded Arabic month name", function()
   local cfg = M._readConfig()
   local entry = { timings = { Fajr = "05:00" },

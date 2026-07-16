@@ -794,6 +794,93 @@ function M._scheduleRetry(nowCtx)
   return delay
 end
 
+-- ── Task 6.2: calendar month fetch/cache ────────────────────────────────────
+-- Ported from /tmp/legacy-v4-plugins/mawaqit/Panel.qml's calItem.fetchCalendar
+-- / saveCalCache / loadCalCache (~L253-274, ~L615-646), adapted to the
+-- filesystem-backed pluginDataDir cache instead of v4's pluginSettings blob.
+
+local CAL_CACHE_TTL_SECONDS = 30 * 24 * 3600 -- 30 days, per v4's 2592000000ms
+
+function M._calCachePath(y, m)
+  return string.format("%s/cal_%d_%d.json", noctalia.pluginDataDir(), y, m)
+end
+
+function M._saveCalCache(y, m, data)
+  local blob = { timestamp = os.time(), data = data }
+  local enc = noctalia.json.encode(blob)
+  if enc then noctalia.writeFile(M._calCachePath(y, m), enc) end
+end
+
+-- Returns (data, timestamp), or nil when there's no fresh cache entry.
+function M._loadCalCache(y, m)
+  local path = M._calCachePath(y, m)
+  if not noctalia.fileExists(path) then return nil end
+  local raw = noctalia.readFile(path)
+  if not raw then return nil end
+  local blob = noctalia.json.decode(raw)
+  if type(blob) ~= "table" or blob.data == nil or not blob.timestamp then return nil end
+  if (os.time() - blob.timestamp) > CAL_CACHE_TTL_SECONDS then return nil end
+  return blob.data, blob.timestamp
+end
+
+function M._formatSyncedAt(ts)
+  if not ts then return "" end
+  return noctalia.formatTime("%d %b, %H:%M", ts)
+end
+
+-- Reads the hijriCtx for M.buildCalendar off the already-published `hijri` /
+-- `gregorian` prayer state (set by M._applyEntry) rather than re-deriving it,
+-- since the calendar always anchors on "today" as last reported by the
+-- prayer-times fetch pipeline.
+function M._currentHijriCtx(cfg)
+  local hijri = noctalia.state.get("hijri") or {}
+  local gregorian = noctalia.state.get("gregorian")
+  local todayJDN = 0
+  if gregorian and gregorian ~= "" then
+    todayJDN = M.parseReadableToJDN(gregorian) or 0
+  end
+  return {
+    todayJDN = todayJDN,
+    hijriDay = hijri.day or 0,
+    hijriMonth = hijri.month or 0,
+    hijriYear = hijri.year or 0,
+    hijriDayOffset = (cfg and cfg.hijriDayOffset) or 0,
+  }
+end
+
+-- Publishes an immediate (estimated) calendar for instant nav feedback, then
+-- resolves the real data from cache (unless `force`) or the hToGCalendar API,
+-- publishing again (synced) once it lands. Mirrors v4's calItem.initCalendar/
+-- navigate always calling updateGrid() synchronously before fetchCalendar()'s
+-- async result replaces it.
+function M._fetchCalendar(month, year, force)
+  local cfg = M._cfg or M._readConfig()
+  local hijriCtx = M._currentHijriCtx(cfg)
+
+  noctalia.state.set("calendar", M.buildCalendar(month, year, hijriCtx, nil, { weekStartDay = cfg.weekStartDay }))
+
+  if not force then
+    local cached, ts = M._loadCalCache(year, month)
+    if cached then
+      noctalia.state.set("calendar", M.buildCalendar(month, year, hijriCtx, cached,
+        { weekStartDay = cfg.weekStartDay, syncedAt = M._formatSyncedAt(ts) }))
+      return
+    end
+  end
+
+  local url = string.format("%s/hToGCalendar/%d/%d", API_BASE, month, year)
+  noctalia.http({ url = url }, function(resp)
+    if resp and resp.ok and resp.status == 200 then
+      local decoded = noctalia.json.decode(resp.body)
+      if type(decoded) == "table" and decoded.code == 200 and type(decoded.data) == "table" then
+        M._saveCalCache(year, month, decoded.data)
+        noctalia.state.set("calendar", M.buildCalendar(month, year, hijriCtx, decoded.data,
+          { weekStartDay = cfg.weekStartDay, syncedAt = M._formatSyncedAt(os.time()) }))
+      end
+    end
+  end)
+end
+
 -- Registers the shared "command" watcher exactly once. Installed from
 -- M._start() (production boot); tests that don't call M._start() (which only
 -- runs past the __MAWAQIT_TEST guard) invoke this directly instead of
@@ -805,6 +892,8 @@ function M._installCommandWatch()
     if type(cmd) ~= "table" then return end
     if cmd.action == "refresh" then
       M._fetch(M._cfg or M._readConfig(), M._nowCtx())
+    elseif cmd.action == "calendar" or cmd.action == "calendarRefresh" then
+      M._fetchCalendar(cmd.month, cmd.year, cmd.action == "calendarRefresh")
     end
   end)
 end
