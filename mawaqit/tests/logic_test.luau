@@ -36,4 +36,33 @@ H.test("buildWeeklyUrl custom angles", function()
   local u = M.buildWeeklyUrl({ city = "X", country = "Y", method = "99", school = "0", fajrAngle = "18", ishaAngle = "17", tune = false }, "16-07-2026")
   H.ok(u:find("methodSettings=18,null,17") ~= nil, "angles")
 end)
+local WEEKLY = { code = 200, data = {
+  { date = { gregorian = { date = "16-07-2026" }, readable = "16 Jul 2026",
+             hijri = { day = "01", month = { number = 1, en = "Muharram", ar = "محرم", days = 30 }, year = "1448" } },
+    timings = { Imsak = "02:40 (BST)", Fajr = "02:50", Sunrise = "05:03", Dhuhr = "13:05",
+                Asr = "17:20", Maghrib = "21:07", Isha = "23:10" } },
+  { date = { gregorian = { date = "17-07-2026" }, readable = "17 Jul 2026",
+             hijri = { day = "02", month = { number = 1, en = "Muharram", ar = "محرم", days = 30 }, year = "1448" } },
+    timings = { Fajr = "02:52", Dhuhr = "13:05", Asr = "17:19", Maghrib = "21:06", Isha = "23:08", Imsak = "02:42", Sunrise = "05:04" } },
+} }
+H.test("normalizeWeekly picks today", function()
+  local e = M.normalizeWeekly(WEEKLY, "2026-07-16")
+  H.eq(e.timings.Fajr, "02:50", "fajr today")
+  H.eq(e.timings.Imsak, "02:40", "imsak cleaned of tz")
+  H.eq(e.gregorian, "16-07-2026", "greg")
+  H.eq(e.readable, "16 Jul 2026", "readable")
+  H.eq(tonumber(e.hijri.day), 1, "hijri day")
+end)
+H.test("normalizeWeekly fallback data[0]", function()
+  local e = M.normalizeWeekly(WEEKLY, "2030-01-01")
+  H.eq(e.gregorian, "16-07-2026", "fallback first")
+end)
+H.test("normalizeSingleDay", function()
+  local e = M.normalizeSingleDay({ code = 200, data = {
+    timings = { Fajr = "03:00 (UTC)", Dhuhr = "13:00", Asr = "17:00", Maghrib = "21:00", Isha = "23:00", Imsak = "02:50", Sunrise = "05:00" },
+    date = { gregorian = { date = "16-07-2026" }, readable = "16 Jul 2026",
+             hijri = { day = "01", month = { number = 1, en = "Muharram", ar = "محرم", days = 30 }, year = "1448" } } } })
+  H.eq(e.timings.Fajr, "03:00", "cleaned")
+  H.eq(e.gregorian, "16-07-2026", "greg")
+end)
 H.finish()

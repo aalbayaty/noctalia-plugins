@@ -60,4 +60,38 @@ function M.buildSingleDayUrl(cfg)
   return string.format("%s/timingsByCity?%s", API_BASE, commonQuery(cfg))
 end
 
+local function ddmmyyyyToISO(d)
+  local dd, mm, yy = d:match("^(%d%d)%-(%d%d)%-(%d%d%d%d)")
+  if not dd then return nil end
+  return string.format("%s-%s-%s", yy, mm, dd)
+end
+
+local function normalizeEntry(rawDate, rawTimings)
+  local timings = {}
+  for k, v in pairs(rawTimings) do timings[k] = M.cleanTime(v) end
+  return {
+    timings = timings,
+    hijri = rawDate.hijri,
+    gregorian = rawDate.gregorian and rawDate.gregorian.date or "",
+    readable = rawDate.readable or "",
+  }
+end
+
+function M.normalizeWeekly(decoded, todayISO)
+  if type(decoded) ~= "table" or decoded.code ~= 200 or type(decoded.data) ~= "table" then return nil end
+  local chosen
+  for _, item in ipairs(decoded.data) do
+    local iso = item.date and item.date.gregorian and ddmmyyyyToISO(item.date.gregorian.date)
+    if iso == todayISO then chosen = item; break end
+  end
+  chosen = chosen or decoded.data[1]
+  if not chosen then return nil end
+  return normalizeEntry(chosen.date, chosen.timings)
+end
+
+function M.normalizeSingleDay(decoded)
+  if type(decoded) ~= "table" or decoded.code ~= 200 or type(decoded.data) ~= "table" then return nil end
+  return normalizeEntry(decoded.data.date, decoded.data.timings)
+end
+
 if _G.__MAWAQIT_TEST or noctalia == nil then return M end
