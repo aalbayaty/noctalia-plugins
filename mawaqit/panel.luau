@@ -285,12 +285,8 @@ end
 
 -- ── Task 5.4: Panel assembly + interactions ──────────────────────────────────
 
--- Placeholder for tab 1 (Calendar) — the real calendar grid lands in Phase 6.
-local function buildCalendarPlaceholder()
-  return ui.box({ fill = "surface_variant", radius = 8 }, { ui.label({ text = noctalia.tr("panel.tab.calendar") }) })
-end
-
--- state: { status, error, prayers, countdown, hijri, gregorian, event, hadith, isRamadan }
+-- state: { status, error, prayers, countdown, hijri, gregorian, event, hadith,
+--          isRamadan, calendar }
 function M.buildTree(state, activeTab)
   state = state or {}
   local children = {
@@ -300,7 +296,7 @@ function M.buildTree(state, activeTab)
     M.buildHint(state.event),
   }
   if activeTab == 1 then
-    table.insert(children, buildCalendarPlaceholder())
+    table.insert(children, M.buildCalendarTab(state.calendar, state.hijri, state.hadith))
   else
     table.insert(children, M.buildStatus(state.status, state.error))
     table.insert(children, M.buildCountdownCard(state.countdown, state.isRamadan))
@@ -329,6 +325,7 @@ local function readState()
     event = noctalia.state.get("event"),
     hadith = noctalia.state.get("hadith"),
     isRamadan = noctalia.state.get("isRamadan"),
+    calendar = noctalia.state.get("calendar"),
   }
 end
 
@@ -348,8 +345,19 @@ local function subscribeOnce()
   noctalia.state.watch("status", M._render)
 end
 
+-- Loads the Arabic calligraphic DecoType font once (Phase 7 ships the actual
+-- fonts/DecoType.ttf asset; until then — and in tests, where noctalia.loadFont
+-- isn't mocked at all — the pcall fails and M.FONT just stays nil, falling
+-- back to the default font everywhere fontFamily = M.FONT is used).
+local function ensureFontLoaded()
+  if M.FONT ~= nil then return end
+  local ok, family = pcall(noctalia.loadFont, "fonts/DecoType.ttf")
+  if ok and family then M.FONT = family end
+end
+
 function onOpen(context)
   subscribeOnce()
+  ensureFontLoaded()
   local hijri = noctalia.state.get("hijri")
   if hijri and hijri.month and hijri.month > 0 and hijri.year and hijri.year > 0 then
     _viewMonth = hijri.month
@@ -361,7 +369,16 @@ end
 function onClose()
 end
 
+function onCalRefresh()
+  noctalia.state.set("command", { action = "calendarRefresh", ts = os.time(), month = _viewMonth, year = _viewYear })
+  M._render()
+end
+
 function onRefresh()
+  if _activeTab == 1 then
+    onCalRefresh()
+    return
+  end
   noctalia.state.set("command", { action = "refresh", ts = os.time() })
   M._render()
 end
@@ -377,6 +394,38 @@ end
 
 function onTabCalendar()
   _activeTab = 1
+  noctalia.state.set("command", { action = "calendar", ts = os.time(), month = _viewMonth, year = _viewYear })
+  M._render()
+end
+
+-- Hijri month wraps 1..12; a wrap also steps the year (per v4's
+-- calItem.navigate(): forward wraps m>12 -> m=1,y++; backward wraps m<1 ->
+-- m=12,y--).
+local function wrapHijriMonth(month, year, delta)
+  local m, y = month + delta, year
+  if m > 12 then m = 1; y = y + 1 end
+  if m < 1 then m = 12; y = y - 1 end
+  return m, y
+end
+
+function onCalPrev()
+  _viewMonth, _viewYear = wrapHijriMonth(_viewMonth, _viewYear, -1)
+  noctalia.state.set("command", { action = "calendar", ts = os.time(), month = _viewMonth, year = _viewYear })
+  M._render()
+end
+
+function onCalNext()
+  _viewMonth, _viewYear = wrapHijriMonth(_viewMonth, _viewYear, 1)
+  noctalia.state.set("command", { action = "calendar", ts = os.time(), month = _viewMonth, year = _viewYear })
+  M._render()
+end
+
+function onCalToday()
+  local hijri = noctalia.state.get("hijri")
+  if hijri and hijri.month and hijri.month > 0 and hijri.year and hijri.year > 0 then
+    _viewMonth = hijri.month
+    _viewYear = hijri.year
+  end
   noctalia.state.set("command", { action = "calendar", ts = os.time(), month = _viewMonth, year = _viewYear })
   M._render()
 end

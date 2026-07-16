@@ -212,4 +212,68 @@ H.test("panel interactions", function()
   H.eq(H.calls.command.action, "calendar", "calendar command on tab switch")
 end)
 
+-- ── Task 6.4: wire tab 1 + calendar nav + fonts ─────────────────────────────
+H.test("onTabCalendar renders the calendar tab tree with a grid", function()
+  H.state.set("calendar", makeCalendar())
+  H.env.onTabCalendar()
+  local tree = H.calls.render
+  -- Header alone contributes 2 buttons (refresh, close); a real calendar grid
+  -- (nav chevrons + 36 leadingBlanks/cells) pushes this well past that.
+  local buttonsAndSpacers = H.findAll(tree, function(n) return n.type == "spacer" or n.type == "button" end)
+  H.ok(#buttonsAndSpacers > 2, "grid rendered with cells, not just the Phase-5 placeholder")
+  H.truthy(H.find(tree, function(n) return n.type == "button" and n.props.glyph == "chevron-left" end), "calendar nav row present")
+  H.env.onTabPrayers()
+end)
+
+H.test("onCalNext advances the viewed month and publishes a calendar command", function()
+  H.state.set("hijri", { day = 1, month = 1, year = 1448, monthNameEn = "Muharram", monthNameAr = "محرم", days = 30 })
+  H.env.onOpen({}) -- seeds _viewMonth/_viewYear from hijri (1, 1448)
+  H.env.onCalNext()
+  H.eq(H.calls.command.action, "calendar", "calendar command")
+  H.eq(H.calls.command.month, 2, "month + 1")
+  H.eq(H.calls.command.year, 1448, "same year (no wrap)")
+end)
+
+H.test("onCalPrev wraps Muharram (1) back to Dhu al-Hijjah (12) of the prior year", function()
+  H.state.set("hijri", { day = 1, month = 1, year = 1448, days = 30 })
+  H.env.onOpen({})
+  H.env.onCalPrev()
+  H.eq(H.calls.command.month, 12, "wraps to month 12")
+  H.eq(H.calls.command.year, 1447, "year - 1 on wrap")
+end)
+
+H.test("onCalNext wraps Dhu al-Hijjah (12) forward to Muharram (1) of the next year", function()
+  H.state.set("hijri", { day = 1, month = 12, year = 1448, days = 30 })
+  H.env.onOpen({})
+  H.env.onCalNext()
+  H.eq(H.calls.command.month, 1, "wraps to month 1")
+  H.eq(H.calls.command.year, 1449, "year + 1 on wrap")
+end)
+
+H.test("onCalToday resets the view to the current hijri month and publishes calendar", function()
+  H.state.set("hijri", { day = 1, month = 3, year = 1448, days = 30 })
+  H.env.onOpen({})
+  H.env.onCalNext(); H.env.onCalNext() -- move away from the current month
+  H.env.onCalToday()
+  H.eq(H.calls.command.month, 3, "back to current month")
+  H.eq(H.calls.command.year, 1448, "same year")
+end)
+
+H.test("onCalRefresh publishes calendarRefresh for the viewed month", function()
+  H.state.set("hijri", { day = 1, month = 1, year = 1448, days = 30 })
+  H.env.onOpen({})
+  H.env.onCalRefresh()
+  H.eq(H.calls.command.action, "calendarRefresh", "calendarRefresh action")
+  H.eq(H.calls.command.month, 1, "viewed month")
+end)
+
+H.test("onRefresh routes to a calendar refresh when the calendar tab is active", function()
+  H.env.onTabCalendar()
+  H.env.onRefresh()
+  H.eq(H.calls.command.action, "calendarRefresh", "refresh routes to calendar refresh on tab 1")
+  H.env.onTabPrayers()
+  H.env.onRefresh()
+  H.eq(H.calls.command.action, "refresh", "refresh stays a prayer refresh on tab 0")
+end)
+
 H.finish()
