@@ -47,8 +47,41 @@ H.test("tick notifies at prayer minute + publishes countdown", function()
 end)
 H.test("command refresh re-fetches", function()
   H.calls.http = nil
+  M._installCommandWatch()
   H.state.set("command", { action = "refresh", ts = 1 })
   H.truthy(H.calls.http, "refresh triggered a fetch")
+end)
+
+H.test("backoff bounds http retries on a failed-fetch day (no hammering)", function()
+  H.setHttpReply({ ok = false, status = 0, body = "" })
+  H.resetHttpCount()
+  local cfg = M._readConfig()
+  local baseNowCtx = { todayISO = "2026-07-17", nowSec = 10*3600, hhmm = "10:00", minute = 600, dayOfYear = 198, gregWeekday = 5 }
+  M._fetch(cfg, baseNowCtx)
+  for i = 1, 4 do
+    M._tick({ todayISO = "2026-07-17", nowSec = 10*3600 + i, hhmm = "10:00", minute = 600, dayOfYear = 198, gregWeekday = 5 })
+  end
+  H.ok(H.httpCount() <= 2, "expected <=2 http calls (weekly+single fallback) within backoff window, got " .. tostring(H.httpCount()))
+end)
+
+H.test("tick does not re-notify the same prayer minute twice in a row", function()
+  H.setHttpReply({ ok = true, status = 200, body = "WEEKLYTOKEN" })
+  local cfg = M._readConfig()
+  local nowCtx = { todayISO = "2026-07-18", nowSec = 13*3600+5*60, hhmm = "13:05", minute = 785, dayOfYear = 199, gregWeekday = 6 }
+  M._fetch(cfg, nowCtx)
+  M._lastNotifiedMinute = nil
+  H.calls.notify = nil
+  M._tick(nowCtx)
+  M._tick(nowCtx)
+  H.eq(#H.calls.notify, 1, "should notify exactly once across repeated ticks at the same minute")
+end)
+
+H.test("hijriDisplayAr trims a padded Arabic month name", function()
+  local cfg = M._readConfig()
+  local entry = { timings = { Fajr = "05:00" },
+    hijri = { day = "5", month = { number = 3, ar = "  ربيع الأول  ", en = "Rabi al-Awwal", days = 30 }, year = "1447" } }
+  local bundle = M._processEntry(entry, cfg, { nowSec = 6*3600, gregWeekday = 2, dayOfYear = 10 })
+  H.eq(bundle.hijri.displayAr, "٥ ربيع الأول ١٤٤٧", "trimmed Arabic month name in displayAr")
 end)
 
 H.finish()

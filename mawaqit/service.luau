@@ -626,7 +626,7 @@ function M._processEntry(entry, cfg, nowCtx)
     hijriDisplay = string.format("%d %s %d AH", hijriDay, monthNameEn, hijriYear)
   end
   if hijriDay > 0 and monthNameAr ~= "" and hijriYear > 0 then
-    hijriDisplayAr = M.toArabicNumerals(hijriDay) .. " " .. monthNameAr .. " " .. M.toArabicNumerals(hijriYear)
+    hijriDisplayAr = M.toArabicNumerals(hijriDay) .. " " .. noctalia.string.trim(monthNameAr) .. " " .. M.toArabicNumerals(hijriYear)
   end
 
   return {
@@ -675,10 +675,10 @@ function M._scheduleRetry(nowCtx)
   return delay
 end
 
--- Registers the shared "command" watcher exactly once. Installed both from
--- M._start() (production boot) and lazily from M._fetch() (so the command
--- channel also works from tests that never call M._start(), which only runs
--- past the __MAWAQIT_TEST guard).
+-- Registers the shared "command" watcher exactly once. Installed from
+-- M._start() (production boot); tests that don't call M._start() (which only
+-- runs past the __MAWAQIT_TEST guard) invoke this directly instead of
+-- piggybacking on M._fetch.
 function M._installCommandWatch()
   if M._commandWatchInstalled then return end
   M._commandWatchInstalled = true
@@ -693,8 +693,22 @@ end
 -- Async weekly fetch -> normalize -> process -> publish, with a single-day
 -- fallback and a {5,10,15,30,60}s backoff schedule (ported from Main.qml's
 -- fetchWeek/fetchSingleDay/scheduleRetry) recorded via M._scheduleRetry.
+--
+-- Reentrancy: M._fetchInFlight mirrors v4's `_xhr` guard — while a fetch
+-- pipeline (weekly, and its possible single-day fallback) is outstanding, a
+-- second call is a no-op. The flag is cleared at every terminal outcome:
+-- weekly success, single-day fallback success, and both-failed.
+--
+-- Attempt tracking: M._lastAttemptDate is stamped at the START of every
+-- attempt (success or failure) so M._tick's date-rollover check can tell "a
+-- fetch was already attempted today" apart from "a fetch already SUCCEEDED
+-- today" (M._lastFetchDate, set only in M._applyEntry). Without this, a
+-- failed day never advances M._lastFetchDate and every 1s tick would re-enter
+-- M._fetch, bypassing the backoff schedule entirely.
 function M._fetch(cfg, nowCtx)
-  M._installCommandWatch()
+  if M._fetchInFlight then return end
+  M._fetchInFlight = true
+  M._lastAttemptDate = nowCtx.todayISO
   M._cfg = cfg
   noctalia.state.set("status", "loading")
   local ddmmyyyy = isoToDDMMYYYY(nowCtx.todayISO)
@@ -710,6 +724,7 @@ function M._fetch(cfg, nowCtx)
       M._nextRetryAt = nil
       M._saveCache(cfg, entry)
       M._applyEntry(entry, cfg, nowCtx)
+      M._fetchInFlight = false
       return
     end
     local singleUrl = M.buildSingleDayUrl(cfg)
@@ -730,6 +745,7 @@ function M._fetch(cfg, nowCtx)
         noctalia.state.set("status", "error")
         noctalia.state.set("error", noctalia.tr("error.generic"))
       end
+      M._fetchInFlight = false
     end)
   end)
 end
@@ -760,7 +776,7 @@ end
 -- retry is pending, else republishes the live countdown and checks notifies.
 function M._tick(nowCtx)
   local cfg = M._cfg or M._readConfig()
-  if not M._lastFetchDate or nowCtx.todayISO ~= M._lastFetchDate then
+  if not M._lastAttemptDate or nowCtx.todayISO ~= M._lastAttemptDate then
     M._fetch(cfg, nowCtx)
     return
   end

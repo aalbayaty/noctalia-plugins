@@ -34,7 +34,12 @@ H.noctalia = {
   tr = function(key, subst) return key end,
   trp = function(key, count, subst) return key .. ":" .. tostring(count) end,
   setUpdateInterval = function(ms) H.calls.interval = ms end,
-  http = function(req, cb) H.calls.http = req; if H._httpReply then cb(H._httpReply) end; return true end,
+  http = function(req, cb)
+    H.calls.http = req
+    H._httpCount = (H._httpCount or 0) + 1
+    if H._httpReply then cb(H._httpReply) end
+    return true
+  end,
   getConfig = function(k) return H._config and H._config[k] end,
   pluginDir = function() return "/tmp/mawaqit-plugindir" end,
   pluginDataDir = function() return "/tmp/mawaqit-datadir" end,
@@ -49,7 +54,8 @@ H.noctalia = {
     end,
     encode = function(v)
       H._jsonStore = H._jsonStore or {}
-      local k = "j"..tostring(#H._jsonStore+1)
+      H._jsonSeq = (H._jsonSeq or 0) + 1
+      local k = "j"..tostring(H._jsonSeq)
       H._jsonStore[k] = v
       return k, nil
     end,
@@ -78,6 +84,8 @@ function H.setConfig(t) H._config = t end
 function H.setHttpReply(r) H._httpReply = r end
 function H.setDecode(fn) H._decode = fn end
 function H.setVertical(b) H._vertical = b end
+function H.httpCount() return H._httpCount or 0 end
+function H.resetHttpCount() H._httpCount = 0 end
 
 function H.installGlobals()
   -- for tests that reference H.ui/H.state directly (harness self-test)
