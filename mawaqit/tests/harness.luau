@@ -41,8 +41,16 @@ H.noctalia = {
   fileExists = function(p) return H._fs ~= nil and H._fs[p] ~= nil end,
   formatTime = function(pat, unix) return "T" end,
   json = {
-    decode = function(s) local ok, v = pcall(function() return H._decode(s) end); if ok then return v, nil else return nil, "decode" end end,
-    encode = function(v) return "{}", nil end,
+    decode = function(s)
+      if H._jsonStore and H._jsonStore[s] then return H._jsonStore[s], nil end
+      local ok, v = pcall(function() return H._decode(s) end); if ok then return v, nil else return nil, "decode" end
+    end,
+    encode = function(v)
+      H._jsonStore = H._jsonStore or {}
+      local k = "j"..tostring(#H._jsonStore+1)
+      H._jsonStore[k] = v
+      return k, nil
+    end,
   },
   string = {
     trim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end,

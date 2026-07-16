@@ -8,4 +8,18 @@ H.test("readConfig maps + defaults", function()
   H.eq(c.tune, true, "tune"); H.eq(c.tuneFajr, 3, "tuneFajr int"); H.eq(c.use12hourFormat, true, "12h")
   H.eq(c.school, "0", "default school"); H.eq(c.weekStartDay, 1, "default weekStart int")
 end)
+H.test("cache save then load valid", function()
+  local cfg = M._readConfig()
+  local entry = { timings = { Fajr = "02:50" }, gregorian = "16-07-2026", readable = "16 Jul 2026", hijri = { day = "1" } }
+  M._saveCache(cfg, entry)
+  local got = M._loadCache(cfg)
+  H.eq(got.timings.Fajr, "02:50", "round-trip")
+end)
+H.test("cache invalidated on city change", function()
+  local cfg = M._readConfig()
+  M._saveCache(cfg, { timings = {}, gregorian = "x", readable = "x", hijri = {} })
+  local other = M._readConfig(); other.city = "Paris"
+  H.eq(M._loadCache(other), nil, "different city invalidates")
+end)
+
 H.finish()

@@ -554,4 +554,28 @@ function M._readConfig()
   }
 end
 
+-- ── Task 3.2: Cache read/write + validation ──────────────────────────────────
+
+function M._cachePath() return (noctalia.pluginDataDir()) .. "/prayer_cache.json" end
+
+function M._saveCache(cfg, entry)
+  local blob = { entry = entry, city = cfg.city, country = cfg.country, method = cfg.method,
+    school = cfg.school, fajrAngle = cfg.fajrAngle, ishaAngle = cfg.ishaAngle }
+  local enc = noctalia.json.encode(blob)
+  if enc then noctalia.writeFile(M._cachePath(), enc) end
+end
+
+function M._loadCache(cfg)
+  if not noctalia.fileExists(M._cachePath()) then return nil end
+  local raw = noctalia.readFile(M._cachePath())
+  if not raw then return nil end
+  local blob = noctalia.json.decode(raw)
+  if type(blob) ~= "table" or not blob.entry then return nil end
+  if blob.city ~= cfg.city or blob.country ~= cfg.country or blob.method ~= cfg.method
+     or blob.school ~= cfg.school or blob.fajrAngle ~= cfg.fajrAngle or blob.ishaAngle ~= cfg.ishaAngle then
+    return nil
+  end
+  return blob.entry
+end
+
 if _G.__MAWAQIT_TEST or noctalia == nil then return M end
