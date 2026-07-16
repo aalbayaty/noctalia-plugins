@@ -27,4 +27,37 @@ function M.formatCountdownText(seconds)
   return string.format("%ds", s)
 end
 
+local API_BASE = "https://api.aladhan.com/v1"
+
+function M.cleanTime(raw)
+  return (tostring(raw):gsub("%s*%(.*%)", ""))
+end
+
+function M.buildTuneParam(cfg)
+  if not cfg.tune then return "0,0,0,0,0,0,0,0,0" end
+  -- Aladhan order: Imsak,Fajr,Sunrise,Dhuhr,Asr,Maghrib,Sunset,Isha,Midnight
+  return string.format("0,%d,0,%d,%d,%d,0,%d,0",
+    cfg.tuneFajr or 0, cfg.tuneDhuhr or 0, cfg.tuneAsr or 0, cfg.tuneMaghrib or 0, cfg.tuneIsha or 0)
+end
+
+local function methodSettings(cfg)
+  local fajr = (cfg.method == "99" and cfg.fajrAngle ~= nil and cfg.fajrAngle ~= "") and cfg.fajrAngle or "null"
+  local isha = (cfg.method == "99" and cfg.ishaAngle ~= nil and cfg.ishaAngle ~= "") and cfg.ishaAngle or "null"
+  return fajr .. ",null," .. isha
+end
+
+local function commonQuery(cfg)
+  local enc = noctalia.string.urlEncode
+  return string.format("city=%s&country=%s&method=%s&methodSettings=%s&school=%s&tune=%s",
+    enc(cfg.city or ""), enc(cfg.country or ""), cfg.method or "3", methodSettings(cfg),
+    cfg.school or "0", M.buildTuneParam(cfg))
+end
+
+function M.buildWeeklyUrl(cfg, ddmmyyyy)
+  return string.format("%s/timingsByCity/%s?%s&days=7", API_BASE, ddmmyyyy, commonQuery(cfg))
+end
+function M.buildSingleDayUrl(cfg)
+  return string.format("%s/timingsByCity?%s", API_BASE, commonQuery(cfg))
+end
+
 if _G.__MAWAQIT_TEST or noctalia == nil then return M end
