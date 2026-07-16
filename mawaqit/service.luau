@@ -342,4 +342,152 @@ function M.estimateMonthLength(hmonth, hyear)
   return (hmonth % 2 ~= 0) and 30 or 29
 end
 
+-- ── Task 2.6: Islamic events, hadith pool, last-ten-nights ──────────────────
+-- Data ported verbatim from /tmp/legacy-v4-plugins/mawaqit/Panel.qml
+-- (islamicEvents/islamicEventsAr maps ~L144-163, hadithPool ~L72-105).
+
+M.EVENTS = {
+  ["1-1"]   = { en = "Islamic New Year", ar = "رأس السنة الهجرية" },
+  ["1-10"]  = { en = "Ashura",           ar = "عاشوراء" },
+  ["3-12"]  = { en = "Mawlid an-Nabi",   ar = "المولد النبوي" },
+  ["7-27"]  = { en = "Isra wal Miraj",   ar = "الإسراء والمعراج" },
+  ["9-1"]   = { en = "Start of Ramadan", ar = "بداية رمضان" },
+  ["9-21"]  = { en = "Laylat al-Qadr",   ar = "ليلة القدر" },
+  ["9-23"]  = { en = "Laylat al-Qadr",   ar = "ليلة القدر" },
+  ["9-25"]  = { en = "Laylat al-Qadr",   ar = "ليلة القدر" },
+  ["9-27"]  = { en = "Laylat al-Qadr",   ar = "ليلة القدر" },
+  ["9-29"]  = { en = "Laylat al-Qadr",   ar = "ليلة القدر" },
+  ["10-1"]  = { en = "Eid al-Fitr",      ar = "عيد الفطر" },
+  ["12-9"]  = { en = "Day of Arafah",    ar = "يوم عرفة" },
+  ["12-10"] = { en = "Eid al-Adha",      ar = "عيد الأضحى" },
+}
+
+function M.eventsFor(hmonth, hday)
+  local key = hmonth .. "-" .. hday
+  if M.EVENTS[key] then return M.EVENTS[key] end
+  if (hday == 13 or hday == 14 or hday == 15) and hmonth ~= 9 and hmonth ~= 10 and hmonth ~= 12 then
+    return { en = "Ayyam al-Bid", ar = "أيام البيض" }
+  end
+  if hday == 29 then
+    return { en = "Laylat al-Shakk", ar = "ليلة الشك" }
+  end
+  return nil
+end
+
+function M.isLastTenNights(hmonth, hday, monthDays)
+  return hmonth == 9 and hday >= 20
+end
+
+M.HADITH = {
+  { text = "إنما الأعمال بالنيات", source = "البخاري" },
+  { text = "المسلم من سلم المسلمون من لسانه ويده", source = "البخاري" },
+  { text = "لا يؤمن أحدكم حتى يحب لأخيه ما يحب لنفسه", source = "البخاري" },
+  { text = "الطهور شطر الإيمان", source = "مسلم" },
+  { text = "خيركم من تعلم القرآن وعلمه", source = "البخاري" },
+  { text = "الدين النصيحة", source = "مسلم" },
+  { text = "من كان يؤمن بالله واليوم الآخر فليقل خيراً أو ليصمت", source = "البخاري" },
+  { text = "البر حسن الخلق", source = "مسلم" },
+  { text = "إن الله رفيق يحب الرفق في الأمر كله", source = "البخاري" },
+  { text = "الكلمة الطيبة صدقة", source = "البخاري" },
+  { text = "خير الناس أنفعهم للناس", source = "الطبراني" },
+  { text = "إن الله جميل يحب الجمال", source = "مسلم" },
+  { text = "أحب الأعمال إلى الله أدومها وإن قل", source = "البخاري" },
+  { text = "اتق الله حيثما كنت", source = "الترمذي" },
+  { text = "إن من أحبكم إليّ وأقربكم مني مجلساً يوم القيامة أحاسنكم أخلاقاً", source = "الترمذي" },
+  { text = "من صام رمضان إيماناً واحتساباً غُفر له ما تقدم من ذنبه", source = "البخاري" },
+  { text = "أفضل الصيام بعد رمضان شهر الله المحرم", source = "مسلم" },
+  { text = "ابتغوا ليلة القدر في الوتر من العشر الأواخر من رمضان", source = "البخاري" },
+  { text = "تبسمك في وجه أخيك صدقة", source = "الترمذي" },
+  { text = "الصلوات الخمس كفارة لما بينهن ما اجتنبت الكبائر", source = "مسلم" },
+  -- Hisn al-Muslim
+  { text = "أعوذُ بكلماتِ اللهِ التّامّاتِ مِن شرِّ ما خَلَق", source = "حصن المسلم" },
+  { text = "بِسْمِ اللَّهِ الَّذِي لَا يَضُرُّ مَعَ اسْمِهِ شَيْءٌ فِي الْأَرْضِ وَلَا فِي السَّمَاءِ وَهُوَ السَّمِيعُ الْعَلِيمُ", source = "حصن المسلم" },
+  { text = "سُبْحَانَ اللهِ وَبِحَمْدِهِ", source = "حصن المسلم" },
+  { text = "حَسْبِيَ اللَّهُ لاَ إِلَهَ إِلاَّ هُوَ عَلَيهِ تَوَكَّلتُ وَهُوَ رَبُّ الْعَرْشِ الْعَظِيمِ", source = "حصن المسلم" },
+  { text = "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْكُفْرِ وَالفَقْرِ وَأَعُوذُ بِكَ مِنْ عَذَابِ القَبْرِ لاَ إِلَهَ إِلاَّ أَنْتَ", source = "حصن المسلم" },
+  { text = "الْحَمْدُ لِلَّهِ الَّذِي أَحْيَانَا بَعْدَ مَا أَمَاتَنَا وَإِلَيْهِ النُّشُورُ", source = "حصن المسلم" },
+  { text = "بِسْمِ اللهِ تَوَكَّلْتُ عَلَى اللهِ وَلاَ حَوْلَ وَلاَ قُوَّةَ إِلاَّ بِاللهِ", source = "حصن المسلم" },
+  { text = "بِسْمِ اللهِ وَالصَّلاَةُ وَالسَّلاَمُ عَلَى رَسُولِ اللهِ اللَّهُمَّ افْتَحْ لِي أَبْوَابَ رَحْمَتِكَ", source = "حصن المسلم" },
+  { text = "لاَ إِلَهَ إِلاَّ اللهُ العَظِيمُ الحَلِيمُ لاَ إِلَهَ إِلاَّ اللهُ رَبُّ العَرْشِ العَظِيمِ لاَ إِلَهَ إِلاَّ اللهُ رَبُّ السَّمَاوَاتِ وَرَبُّ الأَرْضِ وَرَبُّ العَرْشِ الكَرِيمِ", source = "حصن المسلم" },
+  { text = "اللَّهُمَّ لاَ سَهْلَ إِلاَّ مَا جَعَلْتَهُ سَهْلاً وَأَنْتَ تَجْعَلُ الْحَزْنَ إِذَا شِئْتَ سَهْلاً", source = "حصن المسلم" },
+}
+
+function M.hadithForDay(dayOfYear)
+  return M.HADITH[((dayOfYear - 1) % #M.HADITH) + 1]
+end
+
+-- ── upcomingEvent look-ahead (ported from Panel.qml's getHintEvent/upcomingEvent) ──
+-- gregWeekday follows JS Date#getDay() convention: 0=Sun .. 5=Fri .. 6=Sat.
+-- hyear is optional; when omitted, month-12 length falls back to non-leap (29).
+
+local ARABIC_GREETINGS = { ["9-1"] = "رمضان كريم", ["10-1"] = "عيدكم مبارك", ["12-10"] = "عيدكم مبارك" }
+local HINT_TIER1 = { ["1-1"] = "Islamic New Year" }
+local HINT_TIER2 = { ["1-10"] = "Ashura", ["3-12"] = "Mawlid an-Nabi", ["7-27"] = "Isra wal Miraj", ["12-9"] = "Day of Arafah" }
+local HINT_TIER4 = {
+  ["9-1"] = "Start of Ramadan", ["9-20"] = "Laylat al-Qadr", ["9-22"] = "Laylat al-Qadr",
+  ["9-24"] = "Laylat al-Qadr", ["9-26"] = "Laylat al-Qadr", ["9-28"] = "Laylat al-Qadr",
+  ["10-1"] = "Eid al-Fitr", ["12-10"] = "Eid al-Adha",
+}
+local HINT_NAMES_AR = {
+  ["Islamic New Year"] = "رأس السنة الهجرية", ["Ashura"] = "عاشوراء", ["Mawlid an-Nabi"] = "المولد النبوي",
+  ["Isra wal Miraj"] = "الإسراء والمعراج", ["Start of Ramadan"] = "بداية رمضان", ["Laylat al-Qadr"] = "ليلة القدر",
+  ["Eid al-Fitr"] = "عيد الفطر", ["Day of Arafah"] = "يوم عرفة", ["Eid al-Adha"] = "عيد الأضحى",
+  ["Ayyam al-Bid"] = "أيام البيض",
+}
+
+local function getHintEvent(m, d, daysAway)
+  local key = m .. "-" .. d
+  if ARABIC_GREETINGS[key] and daysAway == 0 then
+    return { name = ARABIC_GREETINGS[key], daysAway = 0, tier = 0 }
+  end
+  if HINT_TIER1[key] and daysAway <= 7 then
+    return { name = HINT_NAMES_AR[HINT_TIER1[key]] or HINT_TIER1[key], daysAway = daysAway, tier = 1 }
+  end
+  if HINT_TIER2[key] and daysAway <= 3 then
+    return { name = HINT_NAMES_AR[HINT_TIER2[key]] or HINT_TIER2[key], daysAway = daysAway, tier = 2 }
+  end
+  if (d == 13 or d == 14 or d == 15) and m ~= 9 and m ~= 10 and m ~= 12 and daysAway <= 3 then
+    return { name = "أيام البيض", daysAway = daysAway, tier = 3 }
+  end
+  if d == 29 and daysAway == 0 then
+    return { name = "ليلة الشك", daysAway = 0, tier = 4 }
+  end
+  if HINT_TIER4[key] and daysAway == 0 then
+    return { name = HINT_NAMES_AR[HINT_TIER4[key]] or HINT_TIER4[key], daysAway = 0, tier = 4 }
+  end
+  return nil
+end
+
+function M.upcomingEvent(hmonth, hday, gregWeekday, hyear)
+  if not hmonth or not hday or hmonth == 0 or hday == 0 then return nil end
+  local todayKey = hmonth .. "-" .. hday
+  if gregWeekday == 5 and not ARABIC_GREETINGS[todayKey] then
+    return { daysAhead = 0, nameAr = "جمعة مباركة" }
+  end
+
+  local best = nil
+  local d, m = hday, hmonth
+  local monthLen = M.estimateMonthLength(m, hyear or 0)
+  for i = 0, 30 do
+    local candidate = getHintEvent(m, d, i)
+    if candidate then
+      if not best or candidate.daysAway < best.daysAway
+        or (candidate.daysAway == best.daysAway and candidate.tier < best.tier) then
+        best = candidate
+      end
+    end
+    if best and best.daysAway == 0 and best.tier <= 2 then break end
+    d = d + 1
+    if d > monthLen then
+      d = 1
+      m = m + 1
+      if m > 12 then m = 1 end
+      monthLen = M.estimateMonthLength(m, hyear or 0)
+    end
+  end
+
+  if not best then return nil end
+  return { daysAhead = best.daysAway, nameAr = best.name }
+end
+
 if _G.__MAWAQIT_TEST or noctalia == nil then return M end
