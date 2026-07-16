@@ -135,10 +135,11 @@ end
 
 function M.buildCalNav(calendar)
   local label = (calendar.monthNameEn or "") .. "  " .. tostring(calendar.year or "")
+  local isRamadan = calendar.month == 9
   return ui.row({ justify = "space_between", align = "center" }, {
     ui.button({ glyph = "chevron-left", onClick = "onCalPrev" }),
     ui.column({ gap = 1, align = "center" }, {
-      ui.label({ text = label, fontWeight = "bold", align = "center" }),
+      ui.label({ text = label, fontWeight = "bold", align = "center", color = isRamadan and "primary" or nil }),
       ui.row({ gap = 4, align = "center" }, {
         ui.glyph({ name = calendar.synced and "shield-check" or "calculator", color = calendar.synced and "primary" or "secondary" }),
         ui.label({ text = calendar.gregRange or "", color = "secondary" }),
@@ -202,8 +203,11 @@ local function calDayCell(cell)
 end
 
 -- The 7-col day grid: `calendar.leadingBlanks` leading ui.spacer cells, then
--- one cell per calendar.cells entry — no trailing-blank padding (the grid may
--- end with a ragged last row of fewer than 7 cells).
+-- one cell per calendar.cells entry, then trailing ui.spacer padding out to a
+-- full multiple of 7 — mirrors v4's `Math.ceil(filledCount/7)*7` padding
+-- (Panel.qml:607-612) so every row has exactly 7 cells and columns stay
+-- aligned with the weekday header above (a ragged last row would get spread
+-- across the full width by `justify = "space_between"` and misalign).
 function M.buildCalGrid(calendar)
   local flat = {}
   for _ = 1, (calendar.leadingBlanks or 0) do
@@ -211,6 +215,10 @@ function M.buildCalGrid(calendar)
   end
   for _, cell in ipairs(calendar.cells or {}) do
     table.insert(flat, calDayCell(cell))
+  end
+  local needed = math.ceil(#flat / 7) * 7
+  for _ = #flat + 1, needed do
+    table.insert(flat, ui.spacer())
   end
 
   local rows, row = {}, {}
@@ -220,9 +228,6 @@ function M.buildCalGrid(calendar)
       table.insert(rows, ui.row({ justify = "space_between" }, row))
       row = {}
     end
-  end
-  if #row > 0 then
-    table.insert(rows, ui.row({ justify = "space_between" }, row))
   end
   return ui.column({ gap = 2 }, rows)
 end

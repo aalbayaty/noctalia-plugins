@@ -125,11 +125,23 @@ local function makeCalendar(overrides)
   return cal
 end
 
-H.test("buildCalGrid child count == leadingBlanks + #cells", function()
+H.test("buildCalGrid child count == full 7-col rows (leadingBlanks + #cells, padded)", function()
   local cal = makeCalendar()
   local grid = M.buildCalGrid(cal)
   local nodes = H.findAll(grid, function(n) return n.type == "spacer" or n.type == "button" end)
-  H.eq(#nodes, cal.leadingBlanks + #cal.cells, "leadingBlanks + cells, no trailing pad")
+  local filledCount = cal.leadingBlanks + #cal.cells
+  local expected = math.ceil(filledCount / 7) * 7
+  H.eq(#nodes, expected, "padded to a multiple of 7")
+end)
+
+H.test("buildCalGrid rows are all exactly 7 cells wide (rectangle, no ragged last row)", function()
+  local cal = makeCalendar()
+  local grid = M.buildCalGrid(cal)
+  local rows = H.findAll(grid, function(n) return n.type == "row" end)
+  H.ok(#rows > 0, "grid has rows")
+  for i, row in ipairs(rows) do
+    H.eq(#row.children, 7, "row " .. i .. " has exactly 7 children")
+  end
 end)
 
 H.test("buildCalGrid today cell gets the primary circle fill", function()
@@ -160,6 +172,18 @@ H.test("buildCalNav shows sync glyph when synced, calculator when estimated", fu
   local est = M.buildCalNav(makeCalendar({ synced = false }))
   H.truthy(H.find(synced, function(n) return n.type == "glyph" and n.props.name == "shield-check" end), "synced glyph")
   H.truthy(H.find(est, function(n) return n.type == "glyph" and n.props.name == "calculator" end), "estimate glyph")
+end)
+
+H.test("buildCalNav month label is primary during Ramadan, default otherwise", function()
+  local ramadan = M.buildCalNav(makeCalendar({ month = 9, monthNameEn = "Ramadan" }))
+  local ramadanLabel = H.find(ramadan, function(n) return n.type == "label" and n.props.text:find("Ramadan") ~= nil end)
+  H.truthy(ramadanLabel, "ramadan month label present")
+  H.eq(ramadanLabel.props.color, "primary", "ramadan month label is primary")
+
+  local muharram = M.buildCalNav(makeCalendar({ month = 1, monthNameEn = "Muharram" }))
+  local muharramLabel = H.find(muharram, function(n) return n.type == "label" and n.props.text:find("Muharram") ~= nil end)
+  H.truthy(muharramLabel, "muharram month label present")
+  H.eq(muharramLabel.props.color, nil, "non-ramadan month label keeps default color")
 end)
 
 H.test("buildCalendarTab hides back-to-today on the current month, shows it otherwise", function()
