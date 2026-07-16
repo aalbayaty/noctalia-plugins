@@ -296,4 +296,50 @@ function M.buildPrayerRows(timings, cfg, ctx, nextKey)
   return rows
 end
 
+-- ── Task 2.5: Hijri / JDN math ──────────────────────────────────────────────
+
+function M.toJDN(y, m, d)
+  local a = math.floor((14 - m) / 12)
+  local yy = y + 4800 - a
+  local mm = m + 12 * a - 3
+  return d + math.floor((153 * mm + 2) / 5) + 365 * yy + math.floor(yy / 4)
+       - math.floor(yy / 100) + math.floor(yy / 400) - 32045
+end
+
+function M.jdnToGreg(jdn)
+  local a = jdn + 32044
+  local b = math.floor((4 * a + 3) / 146097)
+  local c = a - math.floor((146097 * b) / 4)
+  local d = math.floor((4 * c + 3) / 1461)
+  local e = c - math.floor((1461 * d) / 4)
+  local m = math.floor((5 * e + 2) / 153)
+  local day = e - math.floor((153 * m + 2) / 5) + 1
+  local month = m + 3 - 12 * math.floor(m / 10)
+  local year = 100 * b + d - 4800 + math.floor(m / 10)
+  return year, month, day
+end
+
+local MONTH_ABBR = { Jan=1, Feb=2, Mar=3, Apr=4, May=5, Jun=6, Jul=7, Aug=8, Sep=9, Oct=10, Nov=11, Dec=12 }
+function M.parseReadableToJDN(readable)
+  local d, mon, y = tostring(readable):match("(%d+)%s+(%a+)%s+(%d+)")
+  if not d then return nil end
+  local mm = MONTH_ABBR[mon]
+  if not mm then return nil end
+  return M.toJDN(tonumber(y), mm, tonumber(d))
+end
+
+function M.weekdayColumn(jdn, weekStartDay)
+  local offset = (weekStartDay + 6) % 7
+  return (jdn % 7 - offset + 7) % 7
+end
+
+local HIJRI_LEAP = { [2]=true,[5]=true,[7]=true,[10]=true,[13]=true,[16]=true,[18]=true,[21]=true,[24]=true,[26]=true,[29]=true }
+function M.isHijriLeapYear(hyear)
+  return HIJRI_LEAP[hyear % 30] == true
+end
+function M.estimateMonthLength(hmonth, hyear)
+  if hmonth == 12 then return M.isHijriLeapYear(hyear) and 30 or 29 end
+  return (hmonth % 2 ~= 0) and 30 or 29
+end
+
 if _G.__MAWAQIT_TEST or noctalia == nil then return M end
