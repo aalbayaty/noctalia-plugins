@@ -114,4 +114,103 @@ function M.buildStatus(status, err)
   return ui.spacer()
 end
 
+-- ── Task 5.4: Panel assembly + interactions ──────────────────────────────────
+
+-- Placeholder for tab 1 (Calendar) — the real calendar grid lands in Phase 6.
+local function buildCalendarPlaceholder()
+  return ui.box({ fill = "surface_variant", radius = 8 }, { ui.label({ text = noctalia.tr("panel.tab.calendar") }) })
+end
+
+-- state: { status, error, prayers, countdown, hijri, gregorian, event, hadith, isRamadan }
+function M.buildTree(state, activeTab)
+  state = state or {}
+  local children = {
+    M.buildHeader(),
+    M.buildDateRow(state.hijri, state.gregorian),
+    M.buildTabs(activeTab),
+    M.buildHint(state.event),
+  }
+  if activeTab == 1 then
+    table.insert(children, buildCalendarPlaceholder())
+  else
+    table.insert(children, M.buildStatus(state.status, state.error))
+    table.insert(children, M.buildCountdownCard(state.countdown, state.isRamadan))
+    table.insert(children, M.buildPrayerList(state.prayers))
+  end
+  return ui.column({ gap = 12 }, children)
+end
+
+-- Local UI-only state: active tab (0 = prayers, 1 = calendar) and the
+-- currently-viewed calendar month/year (seeded from `hijri` state on open;
+-- 1/1400 is just a placeholder until the real hijri date arrives or the
+-- calendar tab (Phase 6) picks its own).
+local _activeTab = 0
+local _viewMonth = 1
+local _viewYear = 1400
+local _subscribed = false
+
+local function readState()
+  return {
+    status = noctalia.state.get("status"),
+    error = noctalia.state.get("error"),
+    prayers = noctalia.state.get("prayers"),
+    countdown = noctalia.state.get("countdown"),
+    hijri = noctalia.state.get("hijri"),
+    gregorian = noctalia.state.get("gregorian"),
+    event = noctalia.state.get("event"),
+    hadith = noctalia.state.get("hadith"),
+    isRamadan = noctalia.state.get("isRamadan"),
+  }
+end
+
+function M._render()
+  panel.render(M.buildTree(readState(), _activeTab))
+end
+
+local function subscribeOnce()
+  if _subscribed then return end
+  _subscribed = true
+  noctalia.state.watch("countdown", M._render)
+  noctalia.state.watch("prayers", M._render)
+  noctalia.state.watch("calendar", M._render)
+  noctalia.state.watch("hijri", M._render)
+  noctalia.state.watch("event", M._render)
+  noctalia.state.watch("hadith", M._render)
+  noctalia.state.watch("status", M._render)
+end
+
+function onOpen(context)
+  subscribeOnce()
+  local hijri = noctalia.state.get("hijri")
+  if hijri and hijri.month and hijri.month > 0 and hijri.year and hijri.year > 0 then
+    _viewMonth = hijri.month
+    _viewYear = hijri.year
+  end
+  M._render()
+end
+
+function onClose()
+end
+
+function onRefresh()
+  noctalia.state.set("command", { action = "refresh", ts = os.time() })
+  M._render()
+end
+
+function onClosePanel()
+  panel.close()
+end
+
+function onTabPrayers()
+  _activeTab = 0
+  M._render()
+end
+
+function onTabCalendar()
+  _activeTab = 1
+  noctalia.state.set("command", { action = "calendar", ts = os.time(), month = _viewMonth, year = _viewYear })
+  M._render()
+end
+
+-- Panels start on `onOpen` (host-driven), not at load time — no `M._start()` here.
 if _G.__MAWAQIT_TEST or noctalia == nil then return M end
