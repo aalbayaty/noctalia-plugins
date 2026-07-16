@@ -36,4 +36,19 @@ H.test("fetch publishes state", function()
   H.truthy(H.state.get("hijri").displayAr, "hijri arabic display")
 end)
 
+H.test("tick notifies at prayer minute + publishes countdown", function()
+  H.calls.notify = nil
+  local cfg = M._readConfig()
+  -- seed current entry via a fetch first (reuses previous test's http mock)
+  M._fetch(cfg, { todayISO = "2026-07-16", nowSec = 13*3600+5*60, dayOfYear = 197, gregWeekday = 4 })
+  M._tick({ todayISO = "2026-07-16", nowSec = 13*3600+5*60, hhmm = "13:05", minute = 785, dayOfYear = 197, gregWeekday = 4 })
+  H.truthy(H.state.get("countdown"), "countdown published")
+  H.truthy(H.calls.notify, "notified at Dhuhr 13:05")
+end)
+H.test("command refresh re-fetches", function()
+  H.calls.http = nil
+  H.state.set("command", { action = "refresh", ts = 1 })
+  H.truthy(H.calls.http, "refresh triggered a fetch")
+end)
+
 H.finish()

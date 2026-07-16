@@ -734,4 +734,88 @@ function M._fetch(cfg, nowCtx)
   end)
 end
 
+-- ── Task 3.4: Tick, notifications, command channel, lifecycle ───────────────
+
+-- Minute-boundary notify dedup (via M._lastNotifiedMinute) + emoji title +
+-- Arabic body, ported from Main.qml's checkPrayerTimes/onPrayerTime. No azan.
+function M._maybeNotify(entry, cfg, ctx, hhmm)
+  if not entry or not entry.timings or not hhmm then return end
+  if hhmm == M._lastNotifiedMinute then return end
+  for _, key in ipairs(M.NOTIFY_KEYS) do
+    if entry.timings[key] == hhmm then
+      M._lastNotifiedMinute = hhmm
+      if cfg.showNotifications then
+        if key == "Imsak" then
+          noctalia.notify("🌙 Imsak — " .. hhmm, "حان وقت الإمساك")
+        else
+          local arName = M._PRAYER_NAMES_AR[key] or key
+          noctalia.notify("🕌 " .. key .. " — " .. hhmm, "حان الآن موعد صلاة " .. arName)
+        end
+      end
+    end
+  end
+end
+
+-- Pure-driving tick helper: refetches on date rollover or when a due backoff
+-- retry is pending, else republishes the live countdown and checks notifies.
+function M._tick(nowCtx)
+  local cfg = M._cfg or M._readConfig()
+  if not M._lastFetchDate or nowCtx.todayISO ~= M._lastFetchDate then
+    M._fetch(cfg, nowCtx)
+    return
+  end
+  if M._status == "error" and M._nextRetryAt and nowCtx.nowSec >= M._nextRetryAt then
+    M._fetch(cfg, nowCtx)
+    return
+  end
+  if M._currentEntry then
+    local ctx = { isRamadan = M._currentIsRamadan, isJumuah = nowCtx.gregWeekday == 5 }
+    local countdown = M.computeCountdown(M._currentEntry.timings, nowCtx.nowSec, cfg, ctx)
+    noctalia.state.set("countdown", countdown)
+    if nowCtx.hhmm then
+      M._maybeNotify(M._currentEntry, cfg, ctx, nowCtx.hhmm)
+    end
+  end
+end
+
+-- Builds the tick context from wall-clock time (os.time/os.date), for the
+-- host-driven update()/onConfigChanged() globals below.
+function M._nowCtx()
+  local t = os.date("*t")
+  local nowSec = t.hour * 3600 + t.min * 60 + t.sec
+  return {
+    todayISO = string.format("%04d-%02d-%02d", t.year, t.month, t.day),
+    nowSec = nowSec,
+    hhmm = string.format("%02d:%02d", t.hour, t.min),
+    minute = math.floor(nowSec / 60),
+    dayOfYear = t.yday or 0,
+    gregWeekday = (t.wday or 1) - 1, -- os.date wday: 1=Sun..7=Sat -> JS-style 0=Sun..6=Sat
+  }
+end
+
+function M._start()
+  local cfg = M._readConfig()
+  M._cfg = cfg
+  noctalia.setUpdateInterval(1000)
+  M._installCommandWatch()
+  local ctx = M._nowCtx()
+  local cached = M._loadCache(cfg)
+  if cached then
+    M._applyEntry(cached, cfg, ctx)
+  end
+  M._fetch(cfg, ctx)
+end
+
+function update()
+  M._tick(M._nowCtx())
+end
+
+function onConfigChanged()
+  M._fetch(M._readConfig(), M._nowCtx())
+end
+
+function onExit(signal)
+end
+
 if _G.__MAWAQIT_TEST or noctalia == nil then return M end
+M._start()
