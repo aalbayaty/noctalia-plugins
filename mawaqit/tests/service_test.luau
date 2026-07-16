@@ -1,0 +1,11 @@
+--!nonstrict
+local H = require("./harness")
+H.setConfig({ city = "Cairo", country = "EG", method = "5", tune = true, tuneFajr = 3, use12hourFormat = true })
+local M = H.loadEntry("../service")
+H.test("readConfig maps + defaults", function()
+  local c = M._readConfig()
+  H.eq(c.city, "Cairo", "city"); H.eq(c.country, "EG", "country"); H.eq(c.method, "5", "method")
+  H.eq(c.tune, true, "tune"); H.eq(c.tuneFajr, 3, "tuneFajr int"); H.eq(c.use12hourFormat, true, "12h")
+  H.eq(c.school, "0", "default school"); H.eq(c.weekStartDay, 1, "default weekStart int")
+end)
+H.finish()

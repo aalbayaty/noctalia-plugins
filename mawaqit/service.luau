@@ -531,4 +531,27 @@ M.MONTH_NAMES_EN = { "Muharram", "Safar", "Rabi al-Awwal", "Rabi ath-Thani", "Ju
 M.MONTH_NAMES_AR = { "محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى",
   "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة" }
 
+-- ── Task 3.1: Config reader ──────────────────────────────────────────────────
+
+local function cfgStr(key, default) local v = noctalia.getConfig(key); if v == nil then return default end; return v end
+local function cfgInt(key, default) local v = noctalia.getConfig(key); if v == nil then return default end; return tonumber(v) or default end
+local function cfgBool(key, default) local v = noctalia.getConfig(key); if v == nil then return default end; return v == true end
+
+function M._readConfig()
+  return {
+    city = cfgStr("city", "London"), country = cfgStr("country", "UK"),
+    method = cfgStr("method", "3"), fajrAngle = cfgStr("fajrAngle", ""), ishaAngle = cfgStr("ishaAngle", ""),
+    school = cfgStr("school", "0"),
+    hijriDayOffset = cfgInt("hijriDayOffset", 0), weekStartDay = cfgInt("weekStartDay", 1),
+    tune = cfgBool("tune", false),
+    tuneFajr = cfgInt("tuneFajr", 0), tuneDhuhr = cfgInt("tuneDhuhr", 0), tuneAsr = cfgInt("tuneAsr", 0),
+    tuneMaghrib = cfgInt("tuneMaghrib", 0), tuneIsha = cfgInt("tuneIsha", 0),
+    showCountdown = cfgBool("showCountdown", true), showElapsed = cfgBool("showElapsed", false),
+    hidePrayerName = cfgBool("hidePrayerName", false), use12hourFormat = cfgBool("use12hourFormat", false),
+    widgetIcon = cfgStr("widgetIcon", "building-mosque"), dynamicIcon = cfgBool("dynamicIcon", false),
+    textColor = cfgStr("textColor", "none"), iconColor = cfgStr("iconColor", "none"), activeColor = cfgStr("activeColor", "primary"),
+    showNotifications = cfgBool("showNotifications", true),
+  }
+end
+
 if _G.__MAWAQIT_TEST or noctalia == nil then return M end
