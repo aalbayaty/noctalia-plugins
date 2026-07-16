@@ -375,7 +375,7 @@ function M.eventsFor(hmonth, hday)
 end
 
 function M.isLastTenNights(hmonth, hday, monthDays)
-  return hmonth == 9 and hday >= 20
+  return hmonth == 9 and hday >= 20 and not (hday == 29 and monthDays == 29)
 end
 
 M.HADITH = {
@@ -412,8 +412,13 @@ M.HADITH = {
   { text = "اللَّهُمَّ لاَ سَهْلَ إِلاَّ مَا جَعَلْتَهُ سَهْلاً وَأَنْتَ تَجْعَلُ الْحَزْنَ إِذَا شِئْتَ سَهْلاً", source = "حصن المسلم" },
 }
 
+-- v4's `dailyHadith` indexes 0-based: `hadithPool[dayOfYear % hadithPool.length]`
+-- (dayOfYear itself is 0-based, from `new Date(y,0,0)`). Luau arrays are
+-- 1-based, so the equivalent lookup is `(dayOfYear % #M.HADITH) + 1` — NOT
+-- `((dayOfYear - 1) % #M.HADITH) + 1`, which shifts the whole pool by one day
+-- relative to v4.
 function M.hadithForDay(dayOfYear)
-  return M.HADITH[((dayOfYear - 1) % #M.HADITH) + 1]
+  return M.HADITH[(dayOfYear % #M.HADITH) + 1]
 end
 
 -- ── upcomingEvent look-ahead (ported from Panel.qml's getHintEvent/upcomingEvent) ──

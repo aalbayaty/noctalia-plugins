@@ -129,9 +129,19 @@ H.test("isLastTenNights", function()
   H.eq(M.isLastTenNights(9, 19, 30), false, "day 19")
   H.eq(M.isLastTenNights(1, 25, 30), false, "not ramadan")
 end)
+H.test("isLastTenNights excludes day 29 of a 29-day Ramadan", function()
+  H.eq(M.isLastTenNights(9, 29, 29), false, "29th of a short (29-day) Ramadan is not a last-ten night")
+  H.eq(M.isLastTenNights(9, 29, 30), true, "29th of a full (30-day) Ramadan still counts")
+end)
 H.test("hadithForDay deterministic + shaped", function()
   local a = M.hadithForDay(1); H.truthy(a.text, "text"); H.truthy(a.source, "source")
   H.eq(M.hadithForDay(1).text, a.text, "same day same hadith")
+end)
+H.test("hadithForDay v4 parity (0-based dayOfYear, wraps to first entry)", function()
+  -- v4: hadithPool[dayOfYear % hadithPool.length] (0-based JS index).
+  -- dayOfYear=0 and dayOfYear=#M.HADITH both land on JS index 0 == Luau index 1.
+  H.eq(M.hadithForDay(0).text, M.HADITH[1].text, "day 0 -> first entry")
+  H.eq(M.hadithForDay(30).text, M.HADITH[1].text, "day == pool length wraps to first entry")
 end)
 
 H.test("prayerGlyph", function()
@@ -148,6 +158,50 @@ H.test("constants", function()
   H.eq(M.PRAYER_ORDER[1], "Imsak", "order")
   H.eq(#M.PRAYER_KEYS, 5, "five countdown keys")
   H.eq(M.MONTH_NAMES_EN[9], "Ramadan", "ramadan is 9th")
+end)
+
+-- ── M.upcomingEvent (ported from v4 Panel.qml getHintEvent/upcomingEvent) ──
+-- gregWeekday follows JS Date#getDay(): 0=Sun .. 5=Fri .. 6=Sat. Non-Friday
+-- weekdays below (e.g. 3=Wed) are chosen so the Jumu'ah-greeting branch does
+-- not short-circuit the case under test.
+H.test("upcomingEvent tier-2 same-month lookahead (Ashura, 2 days out)", function()
+  local e = M.upcomingEvent(1, 8, 3) -- Muharram 8 -> Ashura (1-10) is 2 days away
+  H.truthy(e, "event found")
+  H.eq(e.daysAhead, 2, "2 days ahead of Ashura")
+  H.ok(e.nameAr ~= "", "nameAr non-empty")
+  H.eq(e.nameAr, "عاشوراء", "exact Ashura Arabic name (M.EVENTS['1-10'].ar)")
+end)
+H.test("upcomingEvent same-day tier-1 event (Islamic New Year)", function()
+  local e = M.upcomingEvent(1, 1, 3)
+  H.truthy(e, "event found")
+  H.eq(e.daysAhead, 0, "same day")
+  H.eq(e.nameAr, "رأس السنة الهجرية", "exact New Year Arabic name (M.EVENTS['1-1'].ar)")
+end)
+H.test("upcomingEvent Ayyam al-Bid (13-15 window, allowed month)", function()
+  local e = M.upcomingEvent(2, 13, 3) -- Safar 13 is within Ayyam al-Bid, and not month 9/10/12
+  H.truthy(e, "event found")
+  H.eq(e.daysAhead, 0, "same day")
+  H.ok(e.nameAr ~= "", "nameAr non-empty")
+  H.eq(e.nameAr, "أيام البيض", "exact Ayyam al-Bid Arabic name")
+end)
+H.test("upcomingEvent Friday greeting suppression: Eid al-Fitr wins over Jumu'ah", function()
+  -- 10-1 (Eid al-Fitr) carries its own Arabic greeting, so the Friday ->
+  -- Jumu'ah-greeting short-circuit must NOT fire; the Eid greeting wins.
+  local e = M.upcomingEvent(10, 1, 5)
+  H.truthy(e, "event found")
+  H.eq(e.daysAhead, 0, "same day")
+  H.eq(e.nameAr, "عيدكم مبارك", "Eid greeting wins, not جمعة مباركة")
+end)
+H.test("upcomingEvent plain Friday (no greeting clash) still gets Jumu'ah", function()
+  local e = M.upcomingEvent(2, 20, 5)
+  H.truthy(e, "event found")
+  H.eq(e.daysAhead, 0, "same day")
+  H.eq(e.nameAr, "جمعة مباركة", "Jumu'ah greeting")
+end)
+H.test("upcomingEvent nothing upcoming -> nil", function()
+  -- Safar 20 (non-Friday): no fixed event, no Ayyam al-Bid/Shakk day, and no
+  -- tiered event falls within its look-ahead window over the next ~31 days.
+  H.eq(M.upcomingEvent(2, 20, 3), nil, "no event within range")
 end)
 
 H.finish()
