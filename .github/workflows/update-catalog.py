@@ -11,6 +11,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[2]
 CATALOG_PATH = ROOT_DIR / "catalog.toml"
 REQUIRED_FIELDS = ("id", "name", "version", "author", "min_noctalia", "tags")
+REQUIRED_INT_FIELDS = ("plugin_api",)
 OPTIONAL_STRING_FIELDS = ("license", "icon", "description")
 OPTIONAL_BOOL_FIELDS = ("deprecated",)
 
@@ -30,6 +31,15 @@ def load_plugin_manifest(path: Path) -> dict:
         raise ValueError(f"{path.relative_to(ROOT_DIR)} has invalid tags; expected strings")
 
     out = {field: manifest[field] for field in REQUIRED_FIELDS}
+    for field in REQUIRED_INT_FIELDS:
+        if field not in manifest:
+            raise ValueError(f"{path.relative_to(ROOT_DIR)} is missing: {field}")
+        value = manifest[field]
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ValueError(
+                f"{path.relative_to(ROOT_DIR)} has invalid {field}; expected a positive integer"
+            )
+        out[field] = value
     for field in OPTIONAL_STRING_FIELDS:
         if field in manifest:
             if not isinstance(manifest[field], str):
@@ -96,6 +106,7 @@ def render_catalog(plugins: list[dict]) -> str:
                 f"id = {toml_string(plugin['id'])}",
                 f"name = {toml_string(plugin['name'])}",
                 f"version = {toml_string(plugin['version'])}",
+                f"plugin_api = {plugin['plugin_api']}",
                 f"author = {toml_string(plugin['author'])}",
             ]
         )
