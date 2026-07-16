@@ -1,0 +1,53 @@
+{
+  "menu": { "openPanel": "Open Prayer Times", "settings": "Widget Settings" },
+  "widget": { "soon": "soon", "now": "Now", "tooltip": { "noData": "Prayer data not loaded", "countdown": "Time remaining" } },
+  "panel": {
+    "title": "Prayer Times", "refresh": "Refresh", "close": "Close",
+    "configure": "Set your city in settings to load prayer times.",
+    "now": "Now", "jumuah": "Jumu'ah", "today": "Today", "tomorrow": "Tomorrow",
+    "inDays": { "one": "in {count} day", "other": "in {count} days" },
+    "imsak": "Imsak", "fajr": "Fajr", "sunrise": "Sunrise", "dhuhr": "Dhuhr",
+    "asr": "Asr", "maghrib": "Maghrib", "isha": "Isha",
+    "tab": { "prayers": "Prayer Times", "calendar": "Calendar" }
+  },
+  "calendar": {
+    "today": "Back to today", "refresh": "Refresh", "syncing": "Syncing…",
+    "sync": "Sync: {date}", "approximate": "Estimated (not API-synced)",
+    "weekday": { "mo": "Mo", "tu": "Tu", "we": "We", "th": "Th", "fr": "Fr", "sa": "Sa", "su": "Su" }
+  },
+  "error": { "network": "Network error", "generic": "Could not load prayer times" },
+  "settings": {
+    "city": { "label": "City", "description": "City name for prayer time lookup." },
+    "country": { "label": "Country", "description": "Country name or ISO code." },
+    "method": { "label": "Calculation Method", "description": "Prayer-time calculation authority.",
+      "opt": { "1": "University of Islamic Sciences, Karachi", "2": "ISNA (North America)",
+        "3": "Muslim World League", "4": "Umm Al-Qura, Makkah", "5": "Egyptian General Authority",
+        "7": "Institute of Geophysics, Tehran", "8": "Gulf Region", "9": "Kuwait", "10": "Qatar",
+        "11": "Singapore (MUIS)", "12": "UOIF (France)", "13": "Diyanet (Turkey)", "14": "Russia",
+        "15": "Moonsighting Committee", "16": "Dubai (Experimental)", "19": "Algeria",
+        "23": "Jordan (Awqaf)", "99": "Custom (angles below)" } },
+    "fajrAngle": { "label": "Fajr Angle", "description": "Custom Fajr solar angle (method = Custom)." },
+    "ishaAngle": { "label": "Isha Angle", "description": "Custom Isha solar angle (method = Custom)." },
+    "school": { "label": "Asr School", "description": "Shadow factor for Asr.",
+      "opt": { "0": "Shafi / Maliki / Hanbali", "1": "Hanafi" } },
+    "hijriDayOffset": { "label": "Hijri Day Adjustment", "description": "Shift the Hijri date for local moon sighting.",
+      "opt": { "-1": "−1 day", "0": "Default (from API)", "1": "+1 day" } },
+    "weekStartDay": { "label": "First day of week", "description": "Calendar week start.",
+      "opt": { "6": "Saturday", "0": "Sunday", "1": "Monday" } },
+    "tune": { "label": "Prayer Time Offsets", "description": "Fine-tune each prayer by minutes.",
+      "fajr": "Fajr offset (min)", "dhuhr": "Dhuhr offset (min)", "asr": "Asr offset (min)",
+      "maghrib": "Maghrib offset (min)", "isha": "Isha offset (min)" },
+    "showCountdown": { "label": "Show countdown", "description": "Bar shows live countdown vs static time." },
+    "showElapsed": { "label": "Show elapsed time", "description": "Count up for up to an hour after a prayer." },
+    "hidePrayerName": { "label": "Hide prayer name in bar", "description": "Show only the time/countdown." },
+    "use12hourFormat": { "label": "12-hour time", "description": "Use AM/PM instead of 24-hour." },
+    "widgetIcon": { "label": "Widget icon", "description": "Bar icon glyph." },
+    "dynamicIcon": { "label": "Dynamic prayer icon", "description": "Bar icon follows the next/last prayer." },
+    "textColor": { "label": "Bar text color" },
+    "iconColor": { "label": "Bar icon color" },
+    "activeColor": { "label": "Active color", "description": "Bar color during Now/Elapsed." },
+    "color": { "none": "Default", "primary": "Primary", "secondary": "Secondary", "tertiary": "Tertiary", "error": "Error" },
+    "showNotifications": { "label": "Prayer notifications" },
+    "notifications": { "description": "Send a desktop notification at each prayer time." }
+  }
+}
