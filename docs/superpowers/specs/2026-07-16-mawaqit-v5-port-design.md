@@ -111,11 +111,6 @@ mawaqit/
 ├── service.luau           [[service]] "scheduler" — source of truth
 ├── widget.luau            [[widget]] "bar" — capsule, click → panel
 ├── panel.luau             [[panel]] "panel" — prayer list + Hijri calendar tabs
-├── lib/
-│   ├── prayer.luau        Aladhan URL building, fetch/parse, countdown & next-prayer logic
-│   ├── hijri.luau         JDN math, Hijri month estimation, events map, hadith pool
-│   ├── icons.luau         prayer→glyph map, color-role mapping
-│   └── format.luau        12/24h time formatting, Arabic-Indic numerals, i18n helpers
 ├── fonts/
 │   └── DecoType.ttf       Arabic calligraphic display font
 ├── translations/
@@ -123,96 +118,129 @@ mawaqit/
 │   ├── fr.json
 │   ├── tr.json
 │   └── ar.json            (optional; Arabic strings are inline-Arabic regardless of locale)
+├── tests/                 luau unit tests (run with local `luau` CLI; NOT loaded by the shell)
+│   ├── harness.luau       mock noctalia/ui/barWidget/panel globals + tiny assert runner
+│   ├── logic_test.luau    prayer/countdown/hijri/events/hadith logic (service internals)
+│   ├── widget_test.luau   widget render-from-state assertions
+│   └── panel_test.luau    panel render-from-state assertions
 ├── thumbnail.webp         converted from v4 preview.png (16:9)
 └── README.md
 ```
 
-`lib/*.luau` are `require`-d shared modules. (Confirm during implementation that the Luau VM
-allows plugin-relative `require`; if not, inline the helpers into each entry or load via a single
-shared module pattern the reference plugins use.)
+**No `require` at runtime.** Noctalia loads each entry into an isolated sandbox **without
+`require`** (verified: mpvpaper's source comments "Noctalia plugin scripts run in an isolated
+sandbox without `require`"). So there is no runtime-shared `lib/` directory. Instead
+**`service.luau` is the sole owner of all non-trivial logic** (fetch, parse, countdown, Hijri
+date, calendar, events, hadith, notifications) and publishes **pre-computed, display-ready**
+values to `noctalia.state`; `widget.luau` and `panel.luau` are **thin renderers** that read state
+and send commands back for interactions. Heavy logic therefore lives in exactly one file — nothing
+is duplicated across entries. Testing strategy is in §5.4.
 
 ## 5. Component design
 
-### 5.1 `service.luau` — `[[service]]` "scheduler" (source of truth)
+### 5.1 `service.luau` — `[[service]]` "scheduler" (sole logic owner)
 
-Runs headless for the whole session, even with no bar widget placed (so notifications work
-regardless). Responsibilities:
+Runs headless for the whole session (notifications/scheduling work even with no bar widget
+placed). Owns ALL non-trivial logic and publishes display-ready values; the widget/panel never
+compute prayer/Hijri/calendar data themselves.
 
 - **On load:** read cache from `pluginDataDir()/prayer_cache.json` (instant paint), then
   revalidate over the network. `noctalia.setUpdateInterval(1000)`.
-- **Fetch** (async): build the Aladhan weekly URL (§6), `noctalia.http`, parse via
+- **Prayer fetch** (async): build the Aladhan weekly URL (§6), `noctalia.http`, parse via
   `noctalia.json.decode`, extract today's entry (match `dd-MM-yyyy`→ISO against system date),
-  compute cleaned `timings`, Hijri date fields, `isRamadan`, `isJumuah`. On API/parse/transport
-  error, fall back to the single-day endpoint; on failure schedule a backoff retry
-  (`{5,10,15,30,60}` s). Cache is validated against `city/country/method/school/fajrAngle/
-  ishaAngle`; mismatch → refetch.
-- **Publish** to `noctalia.state`: `status` (loading/ok/error), `error`, `timings`, `hijri`
-  (`{day, month, year, monthNameEn, monthNameAr, days}`), `gregorian`, `isRamadan`, `isJumuah`,
-  and once per second `countdown` (`{next, secondsToNext, label, elapsed, mode}`).
+  compute cleaned `timings`, Hijri date fields, `isRamadan`, `isJumuah` (recomputed each tick —
+  fixes v4's stale-Friday bug). On API/parse/transport error, fall back to the single-day
+  endpoint; on failure schedule a backoff retry (`{5,10,15,30,60}` s). Cache validated against
+  `city/country/method/school/fajrAngle/ishaAngle`; mismatch → refetch.
+- **Calendar** (service-owned, so the Hijri/JDN/events logic exists in ONE file): the panel
+  requests a month via the command channel; the service fetches `hToGCalendar/{m}/{y}` (cached to
+  `pluginDataDir()/cal_{y}_{m}.json`, TTL 30 days, JDN estimation for un-synced months), builds a
+  ready-to-render grid (per-cell: gregorian-day overlay, isToday, isPast, isFriday, event name
+  en/ar), and publishes it to `state.calendar`.
+- **Publish** to `noctalia.state` (all display-ready): `status` (loading/ok/error), `error`,
+  `prayers` (ordered list of `{key,label,time,isNext,highlight}`), `hijri`
+  (`{display, displayAr, day, month, year, monthNameEn, monthNameAr, days}`), `gregorian`,
+  `isRamadan`, `isJumuah`, `event` (current/upcoming hint), `hadith` (`{text, source}`),
+  `calendar`, and — once per second — `countdown`
+  (`{next, label, secondsToNext, text, mode, color, glyph, elapsed}`) where `text`/`glyph`/`color`
+  are already resolved for the bar so the widget only places them.
 - **Tick (`update()`, 1 s):** on date rollover → refetch/reprocess; else recompute countdown /
-  elapsed / "now" grace window and, at each minute boundary, compare `HH:MM` against
-  `{Imsak,Fajr,Dhuhr,Asr,Maghrib,Isha}` and fire `noctalia.notify` (dedup via last-notified
-  minute). **No azan.** Imsak only participates during Ramadan.
-- **`onConfigChanged()`:** clear caches for fetch-relevant setting changes and refetch.
-- **Command channel:** `noctalia.state.watch("command", …)` — panel/widget publish
-  `{action="refresh", ts=…}` to force a prayer-times refresh.
+  elapsed / "now" grace and, at each minute boundary, compare `HH:MM` against
+  `{Imsak,Fajr,Dhuhr,Asr,Maghrib,Isha}` → `noctalia.notify` (dedup via last-notified minute).
+  **No azan.** Imsak only participates during Ramadan.
+- **`onConfigChanged()`:** clear affected caches and refetch.
+- **Command channel** (`noctalia.state.watch("command", …)`): the panel/widget publish
+  `{action, ts, …}` — `refresh` (refetch prayers), `calendar` (`{month, year}` → build/publish
+  that month), `calendarRefresh` (force network re-sync of a month).
 - **`onExit(signal)`:** nothing to clean up (no child processes once azan is dropped).
 
-### 5.2 `widget.luau` — `[[widget]]` "bar"
+### 5.2 `widget.luau` — `[[widget]]` "bar" (thin renderer)
 
-Thin client. `noctalia.state.watch("countdown"/"status"/"timings", render)`; on click →
+`noctalia.state.watch("countdown"/"status", render)`; on click →
 `noctalia.togglePanel("aalbayaty/mawaqit:panel")`. Renders via `barWidget.render()` (declarative,
-needed for icon+text composite and vertical layout) using `barWidget.isVertical()` to pick
-`ui.row` vs `ui.column`.
+for the icon+text composite and vertical layout) using `barWidget.isVertical()` to pick `ui.row`
+vs `ui.column`. The display string, glyph, and color-state are read straight from the
+service-published `countdown` (the v4 display ladder — loading→`"..."`, error→`"!"`, no-data→`"—"`,
+elapsed→`"{label} +Xm"`, now→`"{label} · Now"`, countdown→`"{label} {Xh Ym}"`, else `"{label}
+{HH:MM}"`, all 12h-aware and honoring `hidePrayerName`/`dynamicIcon` — is computed in the service).
+The widget's only local logic is mapping the published color-state (`"normal"`/`"active"`) plus the
+`textColor`/`iconColor`/`activeColor` settings to ui theme roles. Tooltip:
+`"{label}: {time}\nTime remaining: {countdown}"`. **Removed:** azan volume/stop icons.
 
-Display ladder (from v4 `displayText`): loading&no-data→`"..."`; error→`"!"`; no-data→`"—"`;
-elapsed mode→`"{lastLabel} +{m}m|+{h}h {m}m"` (or value only if `hidePrayerName`); prayer now→
-`"{label} · Now"`; countdown on→`"{label} {Xh Ym|Xm|soon}"`; else→`"{label} {HH:MM}"`
-(12h-aware). Icon: `widgetIcon`, or next/last prayer's glyph when `dynamicIcon`. Colors: normal
-uses `iconColor`/`textColor`; `prayerNow||elapsed` uses `activeColor` (mapped to ui theme roles).
-Tooltip: `"{label}: {time}\nTime remaining: {countdown}"`. **Removed:** azan volume/stop icons.
+### 5.3 `panel.luau` — `[[panel]]` "panel" (thin renderer)
 
-### 5.3 `panel.luau` — `[[panel]]` "panel"
-
-`[[panel]]` sized `width=360, height≈640, placement="floating", position="center"` (v4 used
-`360×≤680` scaled). Declarative `panel.render(tree)`; `panel.setWantsSecondTicks(true)` for
-second-precision countdown while open (or watch `countdown` state). Local state: `activeTab`
-(0 = prayers, 1 = calendar), calendar view month/year.
+`[[panel]]` sized `width=360, height≈640, placement="floating", position="center"`. Declarative
+`panel.render(tree)`; watches `countdown`/`prayers`/`calendar`/`hijri`/`event`/`hadith` state and
+re-renders. Local UI-only state: `activeTab` (0 = prayers, 1 = calendar) and the currently-viewed
+calendar `{month, year}`. All data is read from state — the panel computes nothing.
 
 - **Header row:** `ui.glyph` widget icon + bold title + spacer + refresh `ui.button` (publishes
-  `command=refresh` on tab 0; refetches calendar on tab 1) + close `ui.button`→`panel.close()`.
-  (v4 settings button dropped — no API to open plugin settings.)
-- **Date row:** Gregorian readable (left) + Hijri date (right, DecoType font, Arabic-Indic
-  numerals; English `"{d} {Month} {y} AH"` fallback).
-- **Tabs:** two `ui.button`s (variant reflects `activeTab`); clicking sets `activeTab` + re-renders.
-- **Hint banner:** tertiary@10% box, "Today/Tomorrow/in N days" + Arabic event name, when an
-  upcoming event is within its look-ahead window.
-- **Tab 0 — Prayer Times:** countdown card (`ui.box` fill = countdownColor@12%, big countdown
-  label, "now" Arabic line during grace); loading/error strip; prayer list = `ui.column` of
-  `ui.row`s (glyph + label + time), next-prayer & Ramadan Imsak/Maghrib highlighting via
-  fill/color; empty state.
-- **Tab 1 — Calendar:** nav row (chevrons + month/year + sync/estimate indicator), back-to-today
-  link, weekday header (rotated by `weekStartDay`, Friday highlighted), 7-col `ui.column`/`ui.row`
-  grid of day cells (`ui.box`/`ui.button`): today circle, past dimming, Friday highlight, event
-  dot + tooltip (Arabic event), small Gregorian day overlay; below: today's event line,
-  last-10-nights banner, daily hadith block, last-synced label. Calendar month data fetched by
-  the panel from `hToGCalendar/{m}/{y}` and cached to `pluginDataDir()/cal_{y}_{m}.json`
-  (TTL 30 days); estimation via JDN math for un-synced months.
+  `command={action="refresh"}` on tab 0, `command={action="calendarRefresh",…}` on tab 1) + close
+  `ui.button` → `panel.close()`. (v4 settings button dropped — no API to open plugin settings.)
+- **Date row:** `state.gregorian` (left) + `state.hijri.displayAr` (right, DecoType font,
+  Arabic-Indic numerals; `state.hijri.display` English fallback).
+- **Tabs:** two `ui.button`s (variant reflects `activeTab`); clicking sets `activeTab`, and
+  entering the calendar tab publishes `command={action="calendar", month, year}`.
+- **Hint banner:** tertiary@10% box, `state.event` ("Today/Tomorrow/in N days" + Arabic name).
+- **Tab 0 — Prayer Times:** countdown card (`ui.box` fill = `countdown.color`@12%, big
+  `countdown.text`, Arabic "now" line during grace); loading/error strip from `status`/`error`;
+  prayer list = `ui.column` of `ui.row`s over `state.prayers` (glyph + label + time), each row's
+  `isNext`/`highlight` driving fill/color; empty state.
+- **Tab 1 — Calendar:** renders `state.calendar` (already a ready grid). Nav row (chevrons publish
+  `command={action="calendar", month±1, year}`, month/year label, sync/estimate indicator),
+  back-to-today link, weekday header (rotated by `weekStartDay`, Friday highlighted), 7-col grid of
+  cells (`ui.box`/`ui.button`) using each cell's precomputed `isToday`/`isPast`/`isFriday`/`event`/
+  `gday`; event cells show a dot + hover tooltip (Arabic event); below: today's event line,
+  last-10-nights banner, `state.hadith` block, last-synced label.
 
-### 5.4 Shared libs
+### 5.4 Logic organization & testing
 
-- **`lib/prayer.luau`** — URL builders (weekly + single-day), response normalizer (strips
-  ` (TZ)` suffixes), tune-param builder, next-prayer/countdown/elapsed/now-grace computation
-  (`prayerKeys={Fajr,Dhuhr,Asr,Maghrib,Isha}`, +Imsak in Ramadan; Sunrise never counts).
-- **`lib/hijri.luau`** — `toJDN`/`parseToJDN`, weekday-with-offset, month-length estimation
-  (parity + 12th-month leap table `{2,5,7,10,13,16,18,21,24,26,29} mod 30`), events map
-  (en+ar names, fixed dates + Ayyam al-Bid/Qadr rules), upcoming-event look-ahead tiers, hadith
-  pool (30 Arabic items + sources), last-10-nights logic.
-- **`lib/format.luau`** — 12/24h formatting from `use12hourFormat`, Arabic-Indic numeral
-  conversion, `formatCountdown`.
-- **`lib/icons.luau`** — prayer→glyph map (`Imsak=moon, Fajr=sun-moon, Sunrise=sunrise,
-  Dhuhr=sun-high` / Jumu'ah=`building-mosque`, `Asr=sun-low, Maghrib=sunset, Isha=moon-stars`),
-  color-key→ui-theme-role map (`none→default, primary, secondary, tertiary, error`).
+Because the sandbox has no `require`, the runtime logic lives directly inside `service.luau` as
+sectioned `local` functions (URL builders; response normalizer; countdown/next-prayer/elapsed;
+`toJDN`/`parseToJDN`/weekday/month-length estimation with the 12th-month leap table
+`{2,5,7,10,13,16,18,21,24,26,29} mod 30`; events map with en+ar names and Ayyam al-Bid/Qadr rules;
+upcoming-event look-ahead tiers; 30-item hadith pool; 12/24h + Arabic-Indic formatting; the
+prayer→glyph map and color-key→role map).
+
+**Testing without a shell.** The local toolchain is `luau` (run scripts) + `luau-analyze`
+(typecheck/lint) + `python3 .github/workflows/validate-plugins.py` (manifest). Two techniques make
+the logic and the renderers unit-testable off-shell:
+
+1. **`__TEST` export.** Each entry ends with `if _G.__MAWAQIT_TEST then return { …internals… } end`.
+   In production `__MAWAQIT_TEST` is nil, so the guard is skipped and the chunk finishes normally
+   (the shell never sees a return); in tests the harness sets the flag, `load(src)()` returns the
+   internal function table, and assertions run against pure functions (`computeCountdown`,
+   `toJDN`, `eventsFor`, `formatTime`, …) with no network/time dependence (time and decoded-JSON
+   tables are passed in as arguments).
+2. **Mock-global harness** (`tests/harness.luau`): installs stub `noctalia`, `ui`, `barWidget`,
+   `panel` globals that record calls and return `UiNode`-shaped tables (`{type, props, children}`)
+   from `ui.*`, so `widget`/`panel` renders can be driven from a fake state and asserted on tree
+   shape (glyph names, labels, fills) — no real shell required.
+
+`luau-analyze` is a clean gate for pure code but flags the injected globals as "unknown" in the
+entry files; the test/CI step runs it and filters out only the known-injected-global lines
+(`noctalia`, `ui`, `barWidget`, `shortcut`, `launcher`, `desktopWidget`, `panel`), treating any
+other diagnostic as a failure. Live UI/behavior verification happens on the user's v5 shell.
 
 ## 6. Aladhan API endpoints
 
@@ -267,7 +295,8 @@ Every `label_key`/`description_key`/option `label_key` must exist in `translatio
   keys + savedAt), `cal_{y}_{m}.json` (per-month calendar, `{timestamp, data}`; TTL 30 days,
   prune >1 year). Replaces v4's practice of stuffing `_cache*`/`_cal_*` into the settings blob.
 - **In-memory (`noctalia.state`, lost on restart, repopulated by service on load):** `status`,
-  `error`, `timings`, `hijri`, `gregorian`, `isRamadan`, `isJumuah`, `countdown`, `command`.
+  `error`, `prayers`, `hijri`, `gregorian`, `isRamadan`, `isJumuah`, `event`, `hadith`,
+  `calendar`, `countdown`, `command` (all display-ready; see §5.1).
 
 ## 9. Translations
 
@@ -285,14 +314,18 @@ Turkish file where feasible; otherwise host falls back to en.
    Keep v4's English-fallback paths; build & eyeball the Arabic/calendar surfaces early on the
    user's v5 shell before completing the calendar tab.
 2. **Glyph-name availability** — v4 icon names must exist in v5's glyph set. → Verify each against
-   the picker; substitute the closest match where missing (`icons.luau` is the single place to fix).
-3. **`require` of `lib/*`** — if the Luau VM disallows plugin-relative `require`, inline helpers or
-   adopt the reference plugins' module pattern. Resolve in the first implementation step.
-4. **Calendar complexity** — the v4 calendar is 911 lines of QML with canvas-free layout; the
-   7-col grid must be rebuilt from `ui.box`/`ui.row`. Ship prayer-times first, calendar second.
-5. **Limited local verification** — full Noctalia shell may not run in the dev environment;
-   verification here = Luau syntax check + `validate-plugins.py` manifest validation + review.
-   Live UI/behavior verification happens on the user's v5 shell (they are standing one up).
+   the picker; substitute the closest match where missing (the prayer→glyph map in `service.luau`
+   is the single place to fix).
+3. **No `require` in the sandbox (RESOLVED)** — confirmed via mpvpaper's source comments. Handled
+   by making `service.luau` the sole logic owner (widget/panel are thin state-renderers), so no
+   cross-entry code sharing is needed. Logic stays testable via the `__TEST` export + `luau`.
+4. **Calendar complexity** — the v4 calendar is 911 lines of QML; the 7-col grid must be rebuilt
+   from `ui.box`/`ui.row` and the service must pre-shape the grid. Ship prayer-times first,
+   calendar second.
+5. **Local verification is real but partial** — installed toolchain: `luau` (unit-run logic +
+   mock-global renderer tests), `luau-analyze` (typecheck/lint, injected-globals filtered),
+   `python3 validate-plugins.py` (manifest). These gate logic + manifest correctness locally; live
+   UI/RTL/behavior verification happens on the user's v5 shell (they are standing one up).
 6. **`isJumuah` staleness** — v4 snapshotted Friday-ness once; the service recomputes it each tick,
    fixing the midnight-rollover bug.
 
@@ -309,17 +342,22 @@ Turkish file where feasible; otherwise host falls back to en.
 0. **Repo scaffolding (multi-plugin monorepo, §13)** — root `README.md`, `noctalia.d.luau`,
    `.luaurc`, `.vscode/settings.json`, `.gitignore`, adapted `.github/workflows/` (validator +
    catalog generator), initial `catalog.toml`. One-time; reused by every future plugin.
-1. **Scaffold + manifest + i18n** — `mawaqit/plugin.toml` (all settings), `translations/en.json`,
-   resolve `require`/module strategy, plugin passes `validate-plugins.py`.
-2. **Service core** — Aladhan weekly/single-day fetch, parse, cache, 1s tick, countdown/next
-   computation, notifications, state publishing. No UI yet; verify via logs/IPC.
-3. **Bar widget** — declarative capsule, H/V, display ladder, dynamic icon, elapsed, colors,
-   tooltip, click→panel.
-4. **Panel — Prayer Times tab** — header, date row, tabs scaffold, countdown card, prayer list,
-   hint banner, empty/error states.
-5. **Hijri lib + Calendar tab** — JDN math, events, hadith; calendar grid, navigation, overlays,
-   indicators; **validate Arabic/RTL rendering on v5 shell here.**
-6. **Polish + fr/tr/ar translations + README + thumbnail**, final `validate-plugins.py`, push.
+1. **Scaffold + manifest + i18n + test harness** — `mawaqit/plugin.toml` (all settings),
+   `translations/en.json`, `tests/harness.luau` (mock globals + assert runner). Passes
+   `validate-plugins.py` and `luau tests/harness.luau`.
+2. **Service logic (pure, TDD)** — URL builders, response normalizer, countdown/next/elapsed,
+   Hijri `toJDN`/`parseToJDN`/month-length, events map, hadith pool, formatters — all as `local`s
+   in `service.luau` exposed via the `__TEST` export and unit-tested with `luau tests/logic_test.luau`.
+3. **Service runtime wiring** — load/cache/fetch/tick/notify/state-publish/command-channel using
+   the tested logic. `luau-analyze` clean (filtered); verify on shell via IPC/logs.
+4. **Bar widget** — declarative capsule from `countdown` state, H/V, colors, tooltip,
+   click→panel; `tests/widget_test.luau` asserts tree shape via the mock harness.
+5. **Panel — Prayer Times tab** — header, date row, tabs, countdown card, prayer list, hint
+   banner, empty/error; `tests/panel_test.luau` for tree shape.
+6. **Calendar tab + service calendar** — service-side grid build/publish + panel calendar render,
+   navigation, overlays, indicators, hadith/events; **validate Arabic/RTL rendering on v5 shell here.**
+7. **Polish + fr/tr/ar translations + README + thumbnail**, final `validate-plugins.py` +
+   full `luau` test run, push.
 
 ## 13. Repository scaffolding (multi-plugin monorepo)
 
