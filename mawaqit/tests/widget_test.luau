@@ -1,0 +1,23 @@
+--!nonstrict
+local H = require("./harness")
+H.setConfig({ textColor = "none", iconColor = "none", activeColor = "primary" })
+local M = H.loadEntry("../widget")
+local CD = { text = "Dhuhr 1h 5m", glyph = "sun-high", mode = "countdown", color = "primary" }
+H.test("horizontal tree", function()
+  local t = M.buildTree(CD, { textColor="none", iconColor="none", activeColor="primary" }, false)
+  H.eq(t.type, "row", "row")
+  local g = H.find(t, function(n) return n.type == "glyph" end)
+  local l = H.find(t, function(n) return n.type == "label" end)
+  H.eq(g.props.name, "sun-high", "glyph"); H.eq(l.props.text, "Dhuhr 1h 5m", "label")
+end)
+H.test("vertical tree is column", function()
+  local t = M.buildTree(CD, { textColor="none", iconColor="none", activeColor="primary" }, true)
+  H.eq(t.type, "column", "column")
+end)
+H.test("active mode uses activeColor", function()
+  local t = M.buildTree({ text = "Now", glyph = "sun-high", mode = "now", color = "primary" },
+                        { textColor="none", iconColor="none", activeColor="tertiary" }, false)
+  local l = H.find(t, function(n) return n.type == "label" end)
+  H.eq(l.props.color, "tertiary", "active color applied")
+end)
+H.finish()
