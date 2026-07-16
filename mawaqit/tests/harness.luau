@@ -31,6 +31,8 @@ H.noctalia = {
   togglePanel = function(id) H.calls.togglePanel = id end,
   notify = function(t, b) H.calls.notify = H.calls.notify or {}; table.insert(H.calls.notify, { t, b }) end,
   notifyError = function(t, b) H.calls.notifyError = { t, b } end,
+  tr = function(key, subst) return key end,
+  trp = function(key, count, subst) return key .. ":" .. tostring(count) end,
   setUpdateInterval = function(ms) H.calls.interval = ms end,
   http = function(req, cb) H.calls.http = req; if H._httpReply then cb(H._httpReply) end; return true end,
   getConfig = function(k) return H._config and H._config[k] end,

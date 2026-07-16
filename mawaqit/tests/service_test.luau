@@ -22,4 +22,18 @@ H.test("cache invalidated on city change", function()
   H.eq(M._loadCache(other), nil, "different city invalidates")
 end)
 
+H.test("fetch publishes state", function()
+  H.setHttpReply({ ok = true, status = 200, body = "WEEKLYTOKEN" })
+  H.setDecode(function(s) if s == "WEEKLYTOKEN" then return { code = 200, data = {
+    { date = { gregorian = { date = "16-07-2026" }, readable = "16 Jul 2026",
+      hijri = { day = "1", month = { number = 1, en = "Muharram", ar = "محرم", days = 30 }, year = "1448" } },
+      timings = { Imsak="02:40", Fajr="02:50", Sunrise="05:03", Dhuhr="13:05", Asr="17:20", Maghrib="21:07", Isha="23:10" } } } } end return nil end)
+  local cfg = M._readConfig()
+  M._fetch(cfg, { todayISO = "2026-07-16", nowSec = 12*3600, dayOfYear = 197, gregWeekday = 4 })
+  H.eq(H.state.get("status"), "ok", "status ok")
+  H.truthy(H.state.get("prayers"), "prayers published")
+  H.eq(H.state.get("gregorian"), "16 Jul 2026", "gregorian readable")
+  H.truthy(H.state.get("hijri").displayAr, "hijri arabic display")
+end)
+
 H.finish()

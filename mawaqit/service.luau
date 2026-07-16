@@ -578,4 +578,160 @@ function M._loadCache(cfg)
   return blob.entry
 end
 
+-- ── Task 3.3: Fetch pipeline + state publishing ──────────────────────────────
+
+local function isoToDDMMYYYY(iso)
+  local y, m, d = tostring(iso):match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+  if not y then return iso end
+  return string.format("%s-%s-%s", d, m, y)
+end
+
+M._PRAYER_NAMES_AR = { Fajr = "الفجر", Dhuhr = "الظهر", Asr = "العصر", Maghrib = "المغرب", Isha = "العشاء", Imsak = "الإمساك" }
+
+-- Build the publishable state bundle for one Aladhan day entry
+-- ({ timings, hijri, gregorian, readable }). Pure aside from reading noctalia.tr
+-- for the (rare) upcoming-event banner text.
+function M._processEntry(entry, cfg, nowCtx)
+  local hijriRaw = entry.hijri or {}
+  local hijriMonthTbl = hijriRaw.month
+  local hijriDayRaw = tonumber(hijriRaw.day) or 0
+  local hijriMonth = (type(hijriMonthTbl) == "table" and hijriMonthTbl.number) or 0
+  local hijriYear = tonumber(hijriRaw.year) or 0
+  local monthNameEn = (type(hijriMonthTbl) == "table" and hijriMonthTbl.en) or M.MONTH_NAMES_EN[hijriMonth] or ""
+  local monthNameAr = (type(hijriMonthTbl) == "table" and hijriMonthTbl.ar) or M.MONTH_NAMES_AR[hijriMonth] or ""
+  local monthDays = (type(hijriMonthTbl) == "table" and tonumber(hijriMonthTbl.days)) or 30
+  local hijriDay = math.max(1, math.min(30, hijriDayRaw + (cfg.hijriDayOffset or 0)))
+
+  local isRamadan = hijriMonth == 9
+  local isJumuah = nowCtx.gregWeekday == 5
+  local ctx = { isRamadan = isRamadan, isJumuah = isJumuah }
+
+  local countdown = M.computeCountdown(entry.timings, nowCtx.nowSec, cfg, ctx)
+  local prayers = M.buildPrayerRows(entry.timings, cfg, ctx, countdown.next)
+
+  local event = nil
+  local up = M.upcomingEvent(hijriMonth, hijriDay, nowCtx.gregWeekday, hijriYear)
+  if up then
+    local whenText
+    if up.daysAhead == 0 then whenText = noctalia.tr("panel.today")
+    elseif up.daysAhead == 1 then whenText = noctalia.tr("panel.tomorrow")
+    else whenText = noctalia.trp("panel.inDays", up.daysAhead, { count = up.daysAhead }) end
+    event = { whenText = whenText, nameAr = up.nameAr }
+  end
+
+  local hadith = M.hadithForDay(nowCtx.dayOfYear or 0)
+
+  local hijriDisplay, hijriDisplayAr = "", ""
+  if hijriDay > 0 and monthNameEn ~= "" and hijriYear > 0 then
+    hijriDisplay = string.format("%d %s %d AH", hijriDay, monthNameEn, hijriYear)
+  end
+  if hijriDay > 0 and monthNameAr ~= "" and hijriYear > 0 then
+    hijriDisplayAr = M.toArabicNumerals(hijriDay) .. " " .. monthNameAr .. " " .. M.toArabicNumerals(hijriYear)
+  end
+
+  return {
+    status = "ok", error = "",
+    prayers = prayers,
+    hijri = { display = hijriDisplay, displayAr = hijriDisplayAr, day = hijriDay, month = hijriMonth,
+      year = hijriYear, monthNameEn = monthNameEn, monthNameAr = monthNameAr, days = monthDays },
+    gregorian = (entry.readable ~= nil and entry.readable ~= "") and entry.readable or (entry.gregorian or ""),
+    isRamadan = isRamadan, isJumuah = isJumuah,
+    event = event, hadith = hadith, countdown = countdown,
+  }
+end
+
+function M._publish(bundle)
+  noctalia.state.set("status", bundle.status)
+  noctalia.state.set("error", bundle.error)
+  noctalia.state.set("prayers", bundle.prayers)
+  noctalia.state.set("hijri", bundle.hijri)
+  noctalia.state.set("gregorian", bundle.gregorian)
+  noctalia.state.set("isRamadan", bundle.isRamadan)
+  noctalia.state.set("isJumuah", bundle.isJumuah)
+  noctalia.state.set("event", bundle.event)
+  noctalia.state.set("hadith", bundle.hadith)
+  noctalia.state.set("countdown", bundle.countdown)
+end
+
+-- Applies + publishes one fetched/cached entry and remembers it for M._tick.
+function M._applyEntry(entry, cfg, nowCtx)
+  local bundle = M._processEntry(entry, cfg, nowCtx)
+  M._publish(bundle)
+  M._currentEntry = entry
+  M._currentIsRamadan = bundle.isRamadan
+  M._status = bundle.status
+  M._lastFetchDate = nowCtx.todayISO
+  return bundle
+end
+
+M._retryCount = 0
+M._retryDelays = { 5, 10, 15, 30, 60 }
+
+function M._scheduleRetry(nowCtx)
+  local idx = math.min(M._retryCount, #M._retryDelays - 1)
+  local delay = M._retryDelays[idx + 1]
+  M._retryCount = M._retryCount + 1
+  M._nextRetryAt = (nowCtx and nowCtx.nowSec or 0) + delay
+  return delay
+end
+
+-- Registers the shared "command" watcher exactly once. Installed both from
+-- M._start() (production boot) and lazily from M._fetch() (so the command
+-- channel also works from tests that never call M._start(), which only runs
+-- past the __MAWAQIT_TEST guard).
+function M._installCommandWatch()
+  if M._commandWatchInstalled then return end
+  M._commandWatchInstalled = true
+  noctalia.state.watch("command", function(cmd)
+    if type(cmd) ~= "table" then return end
+    if cmd.action == "refresh" then
+      M._fetch(M._cfg or M._readConfig(), M._nowCtx())
+    end
+  end)
+end
+
+-- Async weekly fetch -> normalize -> process -> publish, with a single-day
+-- fallback and a {5,10,15,30,60}s backoff schedule (ported from Main.qml's
+-- fetchWeek/fetchSingleDay/scheduleRetry) recorded via M._scheduleRetry.
+function M._fetch(cfg, nowCtx)
+  M._installCommandWatch()
+  M._cfg = cfg
+  noctalia.state.set("status", "loading")
+  local ddmmyyyy = isoToDDMMYYYY(nowCtx.todayISO)
+  local weeklyUrl = M.buildWeeklyUrl(cfg, ddmmyyyy)
+  noctalia.http({ url = weeklyUrl }, function(resp)
+    local entry = nil
+    if resp and resp.ok and resp.status == 200 then
+      local decoded = noctalia.json.decode(resp.body)
+      entry = M.normalizeWeekly(decoded, nowCtx.todayISO)
+    end
+    if entry then
+      M._retryCount = 0
+      M._nextRetryAt = nil
+      M._saveCache(cfg, entry)
+      M._applyEntry(entry, cfg, nowCtx)
+      return
+    end
+    local singleUrl = M.buildSingleDayUrl(cfg)
+    noctalia.http({ url = singleUrl }, function(resp2)
+      local entry2 = nil
+      if resp2 and resp2.ok and resp2.status == 200 then
+        local decoded2 = noctalia.json.decode(resp2.body)
+        entry2 = M.normalizeSingleDay(decoded2)
+      end
+      if entry2 then
+        M._retryCount = 0
+        M._nextRetryAt = nil
+        M._saveCache(cfg, entry2)
+        M._applyEntry(entry2, cfg, nowCtx)
+      else
+        M._scheduleRetry(nowCtx)
+        M._status = "error"
+        noctalia.state.set("status", "error")
+        noctalia.state.set("error", noctalia.tr("error.generic"))
+      end
+    end)
+  end)
+end
+
 if _G.__MAWAQIT_TEST or noctalia == nil then return M end
