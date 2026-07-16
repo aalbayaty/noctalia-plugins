@@ -114,6 +114,175 @@ function M.buildStatus(status, err)
   return ui.spacer()
 end
 
+-- ── Task 6.3: Calendar tab renderer ──────────────────────────────────────────
+-- Ported from /tmp/legacy-v4-plugins/mawaqit/Panel.qml's calItem (nav row,
+-- weekday header, day Grid delegate, today's-event Text, last-10-nights
+-- Rectangle, daily-Hadith ColumnLayout, last-synced NText, ~L693-905).
+
+-- Mirrors service.luau's M.isLastTenNights(hmonth, hday, monthDays) — panel.luau
+-- can't `require` service.luau, so this tiny check is intentionally duplicated
+-- (keep the two in sync by hand if the Ramadan last-10-nights rule changes).
+local function calIsLastTenNights(hijri)
+  if not hijri or hijri.month ~= 9 then return false end
+  local hday = hijri.day or 0
+  local monthDays = hijri.days or 30
+  return hday >= 20 and not (hday == 29 and monthDays == 29)
+end
+
+local function isCurrentCalMonth(calendar, hijri)
+  return hijri ~= nil and calendar.month == hijri.month and calendar.year == hijri.year
+end
+
+function M.buildCalNav(calendar)
+  local label = (calendar.monthNameEn or "") .. "  " .. tostring(calendar.year or "")
+  return ui.row({ justify = "space_between", align = "center" }, {
+    ui.button({ glyph = "chevron-left", onClick = "onCalPrev" }),
+    ui.column({ gap = 1, align = "center" }, {
+      ui.label({ text = label, fontWeight = "bold", align = "center" }),
+      ui.row({ gap = 4, align = "center" }, {
+        ui.glyph({ name = calendar.synced and "shield-check" or "calculator", color = calendar.synced and "primary" or "secondary" }),
+        ui.label({ text = calendar.gregRange or "", color = "secondary" }),
+      }),
+    }),
+    ui.button({ glyph = "chevron-right", onClick = "onCalNext" }),
+  })
+end
+
+function M.buildCalBackToToday(calendar, hijri)
+  if isCurrentCalMonth(calendar, hijri) then return ui.spacer() end
+  return ui.row({ justify = "center" }, {
+    ui.button({ text = "↩ " .. noctalia.tr("calendar.today"), variant = "ghost", onClick = "onCalToday" }),
+  })
+end
+
+-- Weekday abbreviation keys, in the fixed Mo..Su order used to rotate by
+-- weekStartDay (mirrors v4's `all = ["Mo","Tu","We","Th","Fr","Sa","Su"]`).
+-- Index 5 is always "Fr" — the Jumu'ah column — regardless of rotation.
+local WEEKDAY_KEYS = { "calendar.weekday.mo", "calendar.weekday.tu", "calendar.weekday.we",
+  "calendar.weekday.th", "calendar.weekday.fr", "calendar.weekday.sa", "calendar.weekday.su" }
+
+function M.buildCalWeekdayHeader(weekStartDay)
+  local offset = ((weekStartDay or 1) + 6) % 7
+  local cells = {}
+  for i = 0, 6 do
+    local idx = (offset + i) % 7 + 1
+    table.insert(cells, ui.label({ text = noctalia.tr(WEEKDAY_KEYS[idx]), color = (idx == 5) and "primary" or "secondary" }))
+  end
+  return ui.row({ justify = "space_between" }, cells)
+end
+
+-- One day cell. Uses ui.button (not ui.box) as the cell wrapper so the nested
+-- event-dot ui.box doesn't collide with the wrapper's own node type when
+-- counting/finding cells in tests.
+local function calDayCell(cell)
+  local textColor = nil
+  if cell.isToday then textColor = "on_primary"
+  elseif cell.isPast then textColor = "on_surface/0.3"
+  elseif cell.isFriday then textColor = "primary"
+  elseif cell.eventAr then textColor = "tertiary"
+  end
+
+  local children = {
+    ui.label({ text = tostring(cell.hday), color = textColor, fontWeight = cell.isToday and "bold" or "normal", align = "center" }),
+  }
+  if cell.eventAr and not cell.isToday then
+    table.insert(children, ui.box({ fill = cell.isPast and "tertiary/0.3" or "tertiary", radius = 2, dot = true }))
+  end
+  if cell.gday then
+    table.insert(children, ui.label({ text = tostring(cell.gday), fontSize = 8,
+      color = cell.isToday and "on_primary/0.6" or "secondary/0.6", align = "right" }))
+  end
+
+  return ui.button({
+    fill = cell.isToday and "primary" or "transparent",
+    radius = 999,
+    align = "center",
+    tooltip = cell.eventAr,
+  }, children)
+end
+
+-- The 7-col day grid: `calendar.leadingBlanks` leading ui.spacer cells, then
+-- one cell per calendar.cells entry — no trailing-blank padding (the grid may
+-- end with a ragged last row of fewer than 7 cells).
+function M.buildCalGrid(calendar)
+  local flat = {}
+  for _ = 1, (calendar.leadingBlanks or 0) do
+    table.insert(flat, ui.spacer())
+  end
+  for _, cell in ipairs(calendar.cells or {}) do
+    table.insert(flat, calDayCell(cell))
+  end
+
+  local rows, row = {}, {}
+  for _, node in ipairs(flat) do
+    table.insert(row, node)
+    if #row == 7 then
+      table.insert(rows, ui.row({ justify = "space_between" }, row))
+      row = {}
+    end
+  end
+  if #row > 0 then
+    table.insert(rows, ui.row({ justify = "space_between" }, row))
+  end
+  return ui.column({ gap = 2 }, rows)
+end
+
+-- Today's event line ("🌙 <eventAr>"), only for the currently-viewed month
+-- being the real current Hijri month, and only when the last-10-nights
+-- banner isn't already showing (mirrors v4's `!root.showLast10Nights` gate).
+function M.buildCalTodayEvent(calendar, hijri, showLast10)
+  if showLast10 or not isCurrentCalMonth(calendar, hijri) then return ui.spacer() end
+  local cell = calendar.cells and hijri and calendar.cells[hijri.day]
+  local eventAr = cell and cell.eventAr
+  if not eventAr or eventAr == "" then return ui.spacer() end
+  return ui.label({ text = "🌙 " .. eventAr, color = "tertiary", fontFamily = M.FONT, align = "center" })
+end
+
+function M.buildCalLast10Banner(calendar, hijri, showLast10)
+  if not (showLast10 and isCurrentCalMonth(calendar, hijri)) then return ui.spacer() end
+  return ui.box({ fill = "primary/0.08", radius = 12 }, {
+    ui.label({ text = "العشر الأواخر\nأفضل ليالي رمضان، فيها ليلة القدر خير من ألف شهر", color = "primary", fontFamily = M.FONT, align = "center" }),
+  })
+end
+
+function M.buildCalHadith(hadith, showLast10)
+  if showLast10 or hadith == nil then return ui.spacer() end
+  return ui.column({ gap = 2 }, {
+    ui.separator({}),
+    ui.label({ text = hadith.text or "", fontFamily = M.FONT, align = "center" }),
+    ui.label({ text = (hadith.source ~= nil and hadith.source ~= "") and ("― " .. hadith.source) or "", color = "secondary", align = "center" }),
+  })
+end
+
+function M.buildCalSyncLabel(calendar)
+  local text
+  if calendar.synced then
+    text = noctalia.tr("calendar.sync", { date = calendar.syncedAt or "" })
+  else
+    text = noctalia.tr("calendar.approximate")
+  end
+  return ui.label({ text = text, color = "secondary", align = "center" })
+end
+
+-- M.buildCalendarTab(calendar, hijri, hadith) — full calendar tab: nav row,
+-- back-to-today, weekday header, 7-col grid, today's-event line,
+-- last-10-nights banner, hadith block, and the sync-status label.
+function M.buildCalendarTab(calendar, hijri, hadith)
+  calendar = calendar or {}
+  local showLast10 = calIsLastTenNights(hijri)
+  return ui.column({ gap = 8 }, {
+    M.buildCalNav(calendar),
+    M.buildCalBackToToday(calendar, hijri),
+    M.buildCalWeekdayHeader(calendar.weekStartDay),
+    ui.separator({}),
+    M.buildCalGrid(calendar),
+    M.buildCalTodayEvent(calendar, hijri, showLast10),
+    M.buildCalLast10Banner(calendar, hijri, showLast10),
+    M.buildCalHadith(hadith, showLast10),
+    M.buildCalSyncLabel(calendar),
+  })
+end
+
 -- ── Task 5.4: Panel assembly + interactions ──────────────────────────────────
 
 -- Placeholder for tab 1 (Calendar) — the real calendar grid lands in Phase 6.

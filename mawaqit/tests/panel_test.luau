@@ -109,6 +109,94 @@ H.test("status strip is empty on ok", function()
   H.eq(s.type, "spacer", "spacer on ok")
 end)
 
+-- ── Task 6.3: M.buildCalendarTab (calendar tab renderer) ────────────────────
+local function makeCalendar(overrides)
+  local cells = {}
+  for d = 1, 30 do
+    cells[d] = { hday = d, gday = tostring(d), isToday = false, isPast = false, isFriday = false, eventAr = nil }
+  end
+  cells[5].isToday = true
+  cells[12].eventAr = "عاشوراء"
+  local cal = {
+    month = 1, year = 1448, monthNameEn = "Muharram", synced = true, syncedAt = "16 Jul, 08:00",
+    gregRange = "Jul 2026", weekStartDay = 1, leadingBlanks = 6, cells = cells,
+  }
+  for k, v in pairs(overrides or {}) do cal[k] = v end
+  return cal
+end
+
+H.test("buildCalGrid child count == leadingBlanks + #cells", function()
+  local cal = makeCalendar()
+  local grid = M.buildCalGrid(cal)
+  local nodes = H.findAll(grid, function(n) return n.type == "spacer" or n.type == "button" end)
+  H.eq(#nodes, cal.leadingBlanks + #cal.cells, "leadingBlanks + cells, no trailing pad")
+end)
+
+H.test("buildCalGrid today cell gets the primary circle fill", function()
+  local cal = makeCalendar()
+  local grid = M.buildCalGrid(cal)
+  local today = H.find(grid, function(n) return n.type == "button" and n.props.fill == "primary" end)
+  H.truthy(today, "today cell filled primary")
+end)
+
+H.test("buildCalGrid event cell contains a dot indicator node", function()
+  local cal = makeCalendar()
+  local grid = M.buildCalGrid(cal)
+  local dot = H.find(grid, function(n) return n.type == "box" and n.props.dot == true end)
+  H.truthy(dot, "event dot rendered as a nested box")
+end)
+
+H.test("buildCalNav chevrons carry onCalPrev/onCalNext", function()
+  local cal = makeCalendar()
+  local nav = M.buildCalNav(cal)
+  local prev = H.find(nav, function(n) return n.type == "button" and n.props.glyph == "chevron-left" end)
+  local nxt = H.find(nav, function(n) return n.type == "button" and n.props.glyph == "chevron-right" end)
+  H.truthy(prev, "prev button present"); H.eq(prev.props.onClick, "onCalPrev", "prev cb")
+  H.truthy(nxt, "next button present"); H.eq(nxt.props.onClick, "onCalNext", "next cb")
+end)
+
+H.test("buildCalNav shows sync glyph when synced, calculator when estimated", function()
+  local synced = M.buildCalNav(makeCalendar({ synced = true }))
+  local est = M.buildCalNav(makeCalendar({ synced = false }))
+  H.truthy(H.find(synced, function(n) return n.type == "glyph" and n.props.name == "shield-check" end), "synced glyph")
+  H.truthy(H.find(est, function(n) return n.type == "glyph" and n.props.name == "calculator" end), "estimate glyph")
+end)
+
+H.test("buildCalendarTab hides back-to-today on the current month, shows it otherwise", function()
+  local cal = makeCalendar()
+  local hijriCurrent = { day = 5, month = 1, year = 1448, days = 30 }
+  local treeCurrent = M.buildCalendarTab(cal, hijriCurrent, nil)
+  H.eq(H.find(treeCurrent, function(n) return n.props.onClick == "onCalToday" end), nil, "no back-to-today on current month")
+
+  local hijriOther = { day = 5, month = 2, year = 1448, days = 29 }
+  local treeOther = M.buildCalendarTab(cal, hijriOther, nil)
+  H.truthy(H.find(treeOther, function(n) return n.props.onClick == "onCalToday" end), "back-to-today shown off the current month")
+end)
+
+H.test("buildCalendarTab renders the hadith block", function()
+  local cal = makeCalendar()
+  local tree = M.buildCalendarTab(cal, { day = 5, month = 1, year = 1448, days = 30 }, { text = "hadith text", source = "البخاري" })
+  H.truthy(H.find(tree, function(n) return n.type == "label" and n.props.text == "hadith text" end), "hadith text shown")
+  H.truthy(H.find(tree, function(n) return n.type == "label" and n.props.text == "― البخاري" end), "hadith source shown")
+end)
+
+H.test("buildCalendarTab shows the last-10-nights banner and suppresses hadith during it", function()
+  local cal = makeCalendar({ month = 9, monthNameEn = "Ramadan" })
+  local hijri = { day = 22, month = 9, year = 1448, days = 30 }
+  local tree = M.buildCalendarTab(cal, hijri, { text = "hadith text", source = "البخاري" })
+  H.truthy(H.find(tree, function(n) return n.type == "label" and n.props.text and n.props.text:find("العشر الأواخر") ~= nil end),
+    "last-10-nights banner shown")
+  H.eq(H.find(tree, function(n) return n.type == "label" and n.props.text == "hadith text" end), nil,
+    "hadith suppressed while last-10-nights banner shows")
+end)
+
+H.test("buildCalendarTab sync label reflects synced vs estimated state", function()
+  local t1 = M.buildCalendarTab(makeCalendar({ synced = true }), { day = 5, month = 1, year = 1448, days = 30 }, nil)
+  local t2 = M.buildCalendarTab(makeCalendar({ synced = false }), { day = 5, month = 1, year = 1448, days = 30 }, nil)
+  H.truthy(H.find(t1, function(n) return n.type == "label" and n.props.text == "calendar.sync" end), "synced label key")
+  H.truthy(H.find(t2, function(n) return n.type == "label" and n.props.text == "calendar.approximate" end), "estimate label key")
+end)
+
 H.test("panel interactions", function()
   H.state.set("status", "ok")
   H.state.set("prayers", { { key="Fajr", label="Fajr", time="02:50", isNext=true, highlight="next" } })
