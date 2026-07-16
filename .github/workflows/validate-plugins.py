@@ -46,6 +46,7 @@ PANEL_POSITIONS = {
 ROOT_FIELDS = set(ROOT_STRING_FIELDS) | set(ROOT_ARRAY_FIELDS) | set(ENTRY_TYPES) | {
     "setting",
     "deprecated",
+    "plugin_api",
 }
 BASE_ENTRY_FIELDS = {"id", "entry"}
 ENTRY_FIELDS = {
@@ -247,6 +248,9 @@ class Validator:
 
         if "deprecated" in manifest and not isinstance(manifest["deprecated"], bool):
             self.add_error(manifest_path, "root field 'deprecated' must be a bool")
+
+        if "plugin_api" in manifest and not is_int(manifest["plugin_api"]):
+            self.add_error(manifest_path, "root field 'plugin_api' must be an integer")
 
         plugin_dir = manifest_path.parent.name
         author = manifest.get("author")
