@@ -83,6 +83,21 @@ H.test("plain row uses surface_variant fill", function()
   local row = H.find(list, function(n) return n.type == "row" end)
   H.eq(row.props.fill, "surface_variant", "plain row fill")
 end)
+H.test("prayer list renders the published Jumuah-aware glyph for Dhuhr on Friday", function()
+  local prayers = {
+    { key="Fajr", label="Fajr", time="02:50", isNext=false, highlight="none" },
+    { key="Dhuhr", label="Jumu'ah", glyph="building-mosque", time="13:05", isNext=false, highlight="none" },
+    { key="Asr", label="Asr", time="17:20", isNext=false, highlight="none" },
+  }
+  local list = M.buildPrayerList(prayers)
+  local dhuhrRow = H.find(list, function(n)
+    return n.type == "row" and H.find(n, function(c) return c.type == "label" and c.props.text == "Jumu'ah" end) ~= nil
+  end)
+  H.truthy(dhuhrRow, "dhuhr row found")
+  local glyphNode = H.find(dhuhrRow, function(n) return n.type == "glyph" end)
+  H.truthy(glyphNode, "glyph node present")
+  H.eq(glyphNode.props.name, "building-mosque", "dhuhr uses published jumuah glyph, not the duplicated non-jumuah map")
+end)
 H.test("hint banner shows event text", function()
   local hint = M.buildHint({ whenText = "Today", nameAr = "جمعة مباركة" })
   local when = H.find(hint, function(n) return n.type == "label" and n.props.text == "Today" end)

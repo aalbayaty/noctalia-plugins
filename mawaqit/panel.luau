@@ -63,16 +63,6 @@ end
 
 -- ── Task 5.3: Prayer list + hint banner + status/error ───────────────────────
 
--- The panel can't `require` service.luau (sandbox has no `require`), so this
--- tiny prayer→glyph map is intentionally duplicated from service.luau's
--- `M.PRAYER_GLYPHS` — keep the two in sync by hand if prayer keys/icons change.
-local PRAYER_GLYPHS = { Imsak = "moon", Fajr = "sun-moon", Sunrise = "sunrise", Dhuhr = "sun-high",
-  Asr = "sun-low", Maghrib = "sunset", Isha = "moon-stars" }
-
-function M.rowGlyph(key)
-  return PRAYER_GLYPHS[key] or "building-mosque"
-end
-
 local function rowFill(highlight)
   if highlight == "next" then return "primary/0.15" end
   if highlight == "imsak" then return "secondary/0.08" end
@@ -84,7 +74,7 @@ function M.buildPrayerList(prayers)
   local rows = {}
   for _, p in ipairs(prayers or {}) do
     table.insert(rows, ui.row({ fill = rowFill(p.highlight), gap = 8, align = "center" }, {
-      ui.glyph({ name = M.rowGlyph(p.key) }),
+      ui.glyph({ name = p.glyph or "building-mosque" }),
       ui.label({ text = p.label }),
       ui.spacer(),
       ui.label({ text = p.time or "—" }),
