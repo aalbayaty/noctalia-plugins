@@ -40,9 +40,29 @@ end
 -- ── Task 5.2: Tabs + countdown card ──────────────────────────────────────────
 
 function M.buildTabs(activeTab)
-  return ui.row({ gap = 4 }, {
-    ui.button({ text = noctalia.tr("panel.tab.prayers"), variant = (activeTab == 0) and "primary" or "ghost", radius = 999, expand = true, onClick = "onTabPrayers" }),
-    ui.button({ text = noctalia.tr("panel.tab.calendar"), variant = (activeTab == 1) and "primary" or "ghost", radius = 999, expand = true, onClick = "onTabCalendar" }),
+  return ui.row({ gap = 0 }, {
+    ui.button({
+      text = noctalia.tr("panel.tab.prayers"),
+      variant = (activeTab == 0) and "primary" or "ghost",
+      radiusTopLeft = 999,
+      radiusBottomLeft = 999,
+      radiusTopRight = 0,
+      radiusBottomRight = 0,
+      padding = 8,
+      expand = true,
+      onClick = "onTabPrayers",
+    }),
+    ui.button({
+      text = noctalia.tr("panel.tab.calendar"),
+      variant = (activeTab == 1) and "primary" or "ghost",
+      radiusTopLeft = 0,
+      radiusBottomLeft = 0,
+      radiusTopRight = 999,
+      radiusBottomRight = 999,
+      padding = 8,
+      expand = true,
+      onClick = "onTabCalendar",
+    }),
   })
 end
 
@@ -300,7 +320,6 @@ function M.buildCalendarTab(calendar, hijri, gregorian, hadith)
     M.buildCalGrid(calendar),
     M.buildCalTodayEvent(calendar, hijri, showLast10),
     M.buildCalLast10Banner(calendar, hijri, showLast10),
-    M.buildCalHadith(hadith, showLast10),
     M.buildCalSyncLabel(calendar),
   })
 end

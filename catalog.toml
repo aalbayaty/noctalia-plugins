@@ -8,7 +8,7 @@
 [[plugin]]
 id = "aalbayaty/mawaqit"
 name = "Mawaqit"
-version = "2.0.16"
+version = "2.0.18"
 plugin_api = 3
 author = "aalbayaty"
 license = "MIT"
