@@ -189,9 +189,9 @@ local function calDayCell(cell)
     text = tostring(cell.hday),
     color = textColor,
     fontWeight = cell.isToday and "bold" or "normal",
-    fontSize = 13,
+    fontSize = 14,
     width = 32,
-    height = 32,
+    height = 40,
     tooltip = cell.eventAr,
   })
 
@@ -217,7 +217,7 @@ end
 -- Uses a transparent button so it stays invisible (a ui.box with no fill renders
 -- as a solid black rectangle in this theme).
 local function calBlankCell()
-  return ui.button({ text = "", variant = "ghost", fill = "transparent", radius = 999, width = 32, height = 32 })
+  return ui.button({ text = "", variant = "ghost", fill = "transparent", radius = 999, width = 32, height = 40 })
 end
 
 -- The 7-col day grid: `calendar.leadingBlanks` leading placeholder cells, then
@@ -323,6 +323,7 @@ function M.buildTree(state, activeTab)
     table.insert(children, M.buildStatus(state.status, state.error))
     table.insert(children, M.buildCountdownCard(state.countdown, state.isRamadan))
     table.insert(children, M.buildPrayerList(state.prayers))
+    table.insert(children, M.buildCalHadith(state.hadith, false))
   end
   return ui.column({ gap = 8 }, children)
 end
