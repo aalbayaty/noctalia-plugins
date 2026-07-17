@@ -16,3 +16,27 @@ icon = "building-mosque"
 description = "Prayer times with a live countdown and a Hijri calendar with Islamic events."
 min_noctalia = "5.0.0"
 tags = ["Bar", "Panel", "Islam", "Prayer"]
+
+[[plugin]]
+id = "aalbayaty/steam-launcher"
+name = "Steam Launcher"
+version = "1.0.0"
+plugin_api = 3
+author = "aalbayaty"
+license = "MIT"
+icon = "device-gamepad-2"
+description = "Browse and launch installed Steam games from the launcher."
+min_noctalia = "5.0.0"
+tags = ["Launcher", "Gaming"]
+
+[[plugin]]
+id = "aalbayaty/remmina-launcher"
+name = "Remmina Launcher"
+version = "1.0.0"
+plugin_api = 3
+author = "aalbayaty"
+license = "MIT"
+icon = "device-desktop"
+description = "Browse and launch Remmina remote-desktop connections from the launcher."
+min_noctalia = "5.0.0"
+tags = ["Launcher", "Network"]

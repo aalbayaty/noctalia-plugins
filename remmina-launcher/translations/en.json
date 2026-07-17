@@ -1,0 +1,8 @@
+{
+  "settings": {
+    "remminaDir": {
+      "label": "Remmina connections directory",
+      "description": "Path to the folder containing Remmina *.remmina connection files."
+    }
+  }
+}
