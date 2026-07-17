@@ -1,6 +1,6 @@
 id = "aalbayaty/remmina-launcher"
 name = "Remmina Launcher"
-version = "1.0.1"
+version = "1.0.2"
 plugin_api = 3
 min_noctalia = "5.0.0"
 author = "aalbayaty"
