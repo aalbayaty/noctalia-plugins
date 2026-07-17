@@ -1,0 +1,12 @@
+{
+  "settings": {
+    "steamappsDir": {
+      "label": "Steamapps directory",
+      "description": "Path to the Steam library folder containing appmanifest_*.acf files."
+    },
+    "librarycacheDir": {
+      "label": "Librarycache directory",
+      "description": "Path to Steam's appcache/librarycache folder holding per-app cover art."
+    }
+  }
+}

@@ -1,0 +1,33 @@
+id = "aalbayaty/steam-launcher"
+name = "Steam Launcher"
+version = "1.0.0"
+plugin_api = 3
+min_noctalia = "5.0.0"
+author = "aalbayaty"
+license = "MIT"
+dependencies = []
+tags = ["Launcher", "Gaming"]
+icon = "device-gamepad-2"
+description = "Browse and launch installed Steam games from the launcher."
+
+[[launcher_provider]]
+id = "steam"
+entry = "provider.luau"
+prefix = "steam"
+glyph = "device-gamepad-2"
+include_in_global_search = true
+debounce_ms = 100
+
+  [[launcher_provider.setting]]
+  key = "steamappsDir"
+  type = "string"
+  label_key = "settings.steamappsDir.label"
+  description_key = "settings.steamappsDir.description"
+  default = "~/.steam/steam/steamapps"
+
+  [[launcher_provider.setting]]
+  key = "librarycacheDir"
+  type = "string"
+  label_key = "settings.librarycacheDir.label"
+  description_key = "settings.librarycacheDir.description"
+  default = "~/.steam/steam/appcache/librarycache"
