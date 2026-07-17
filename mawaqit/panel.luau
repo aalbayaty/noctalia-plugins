@@ -39,22 +39,34 @@ end
 
 -- ── Task 5.2: Tabs + countdown card ──────────────────────────────────────────
 
+-- Segmented tab bar: two equal-width halves inside one rounded container.
+-- ui.button has no `radius` prop and Noctalia has no per-corner radius, so we
+-- round only the OUTER sides by letting the container's `radius` clip its
+-- children; the inner seam (gap = 0) stays flat. The active half's `primary`
+-- fill lives on the clipped `ui.column` (not on the button's `variant`, whose
+-- own fill would overflow the rounded corner and look square) — a transparent
+-- `ghost` button inside is just the click target + label.
+local function tabHalf(key, textKey, active, onClick)
+  return ui.column({
+    flexGrow = 1,
+    fill = active and "primary" or "#00000000",
+    align = "center",
+    justify = "center",
+  }, {
+    ui.button({
+      key = key,
+      text = noctalia.tr(textKey),
+      variant = active and "primary" or "ghost",
+      flexGrow = 1,
+      onClick = onClick,
+    }),
+  })
+end
+
 function M.buildTabs(activeTab)
-  return ui.row({ gap = 6 }, {
-    ui.button({
-      key = "tab_prayers",
-      text = noctalia.tr("panel.tab.prayers"),
-      variant = (activeTab == 0) and "primary" or "ghost",
-      flexGrow = 1,
-      onClick = "onTabPrayers",
-    }),
-    ui.button({
-      key = "tab_calendar",
-      text = noctalia.tr("panel.tab.calendar"),
-      variant = (activeTab == 1) and "primary" or "ghost",
-      flexGrow = 1,
-      onClick = "onTabCalendar",
-    }),
+  return ui.row({ gap = 0, radius = 999, fill = "surface_variant/0.4" }, {
+    tabHalf("tab_prayers", "panel.tab.prayers", activeTab == 0, "onTabPrayers"),
+    tabHalf("tab_calendar", "panel.tab.calendar", activeTab == 1, "onTabCalendar"),
   })
 end
 
@@ -174,12 +186,19 @@ end
 local WEEKDAY_KEYS = { "calendar.weekday.mo", "calendar.weekday.tu", "calendar.weekday.we",
   "calendar.weekday.th", "calendar.weekday.fr", "calendar.weekday.sa", "calendar.weekday.su" }
 
+-- Shared calendar column width so the weekday header cells sit directly above
+-- the day cells (both use this width + justify = "space_between").
+local CAL_CELL_W = 44
+
 function M.buildCalWeekdayHeader(weekStartDay)
   local offset = ((weekStartDay or 1) + 6) % 7
   local cells = {}
   for i = 0, 6 do
     local idx = (offset + i) % 7 + 1
-    table.insert(cells, ui.label({ text = noctalia.tr(WEEKDAY_KEYS[idx]), color = (idx == 5) and "primary" or "secondary" }))
+    table.insert(cells, ui.column({ width = CAL_CELL_W, align = "center" }, {
+      ui.label({ text = noctalia.tr(WEEKDAY_KEYS[idx]), fontSize = 15, fontWeight = "bold",
+        color = (idx == 5) and "primary" or "secondary", textAlign = "center" }),
+    }))
   end
   return ui.row({ justify = "space_between" }, cells)
 end
@@ -202,7 +221,7 @@ local function calDayCell(cell)
     text = tostring(cell.hday),
     color = textColor,
     fontWeight = cell.isToday and "bold" or "normal",
-    fontSize = 14,
+    fontSize = 17,
     textAlign = "center",
   })
 
@@ -213,7 +232,7 @@ local function calDayCell(cell)
       table.insert(extras, ui.box({ fill = cell.isPast and "tertiary/0.3" or "tertiary", radius = 2, width = 4, height = 4 }))
     end
     if cell.gday then
-      table.insert(extras, ui.label({ text = tostring(cell.gday), fontSize = 8,
+      table.insert(extras, ui.label({ text = tostring(cell.gday), fontSize = 10,
         color = cell.isToday and "on_primary/0.6" or "secondary/0.6", textAlign = "center" }))
     end
     table.insert(children, ui.row({ gap = 2, align = "center", justify = "center" }, extras))
@@ -222,8 +241,8 @@ local function calDayCell(cell)
   return ui.column({
     fill = cell.isToday and "primary" or "#00000000",
     radius = 999,
-    width = 40,
-    height = 32,
+    width = CAL_CELL_W,
+    height = 40,
     align = "center",
     justify = "center",
     gap = 1,
@@ -234,7 +253,7 @@ end
 -- the 7-column grid stays aligned. Uses #00000000 (alpha 0) for true
 -- transparency ("transparent" is not a valid palette role).
 local function calBlankCell()
-  return ui.column({ width = 40, height = 32, fill = "#00000000" })
+  return ui.column({ width = CAL_CELL_W, height = 40, fill = "#00000000" })
 end
 
 -- The 7-col day grid: `calendar.leadingBlanks` leading placeholder cells, then
