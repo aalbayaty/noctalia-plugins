@@ -87,6 +87,7 @@ function M.formatRow(conn)
     title = conn.name,
     subtitle = subtitle,
     glyph = "device-desktop",
+    category = "Network",
     score = nil,
   }
 end

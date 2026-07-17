@@ -90,6 +90,7 @@ function M.formatRow(game)
     title = game.name,
     subtitle = "Steam",
     glyph = "device-gamepad-2",
+    category = "Games",
     score = nil,
   }
   if game.isImage and game.icon ~= "" then

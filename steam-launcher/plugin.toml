@@ -1,6 +1,6 @@
 id = "aalbayaty/steam-launcher"
 name = "Steam Launcher"
-version = "1.0.1"
+version = "1.0.2"
 plugin_api = 3
 min_noctalia = "5.0.0"
 author = "aalbayaty"
@@ -17,6 +17,14 @@ prefix = "steam"
 glyph = "device-gamepad-2"
 include_in_global_search = true
 debounce_ms = 100
+
+  # Provider-local category filter. Plugin providers can't inject into the
+  # Applications launcher's built-in "Games" tab (that's derived from .desktop
+  # Categories=), so we mirror it with a same-label/glyph filter shown while the
+  # steam provider is active. Each result row carries category = "Games".
+  [[launcher_provider.category]]
+  label = "Games"
+  glyph = "device-gamepad-2"
 
 # Plugin-level settings (the shell rejects entry-level [[launcher_provider.setting]]
 # even though validate-plugins.py accepts it — launcher_provider settings must be

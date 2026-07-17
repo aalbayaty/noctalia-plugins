@@ -1,6 +1,6 @@
 id = "aalbayaty/remmina-launcher"
 name = "Remmina Launcher"
-version = "1.0.2"
+version = "1.0.3"
 plugin_api = 3
 min_noctalia = "5.0.0"
 author = "aalbayaty"
@@ -17,6 +17,14 @@ prefix = "remmina"
 glyph = "device-desktop"
 include_in_global_search = true
 debounce_ms = 100
+
+  # Provider-local category filter. Plugin providers can't inject into the
+  # Applications launcher's built-in "Internet/Network" tab (that's derived from
+  # .desktop Categories=), so we mirror it with a same-label/glyph filter shown
+  # while the remmina provider is active. Each result row carries category = "Network".
+  [[launcher_provider.category]]
+  label = "Network"
+  glyph = "network"
 
 # Plugin-level settings (the shell rejects entry-level [[launcher_provider.setting]]
 # even though validate-plugins.py accepts it — launcher_provider settings must be

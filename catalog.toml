@@ -20,7 +20,7 @@ tags = ["Bar", "Panel", "Islam", "Prayer"]
 [[plugin]]
 id = "aalbayaty/steam-launcher"
 name = "Steam Launcher"
-version = "1.0.1"
+version = "1.0.2"
 plugin_api = 3
 author = "aalbayaty"
 license = "MIT"
@@ -32,7 +32,7 @@ tags = ["Launcher", "Gaming"]
 [[plugin]]
 id = "aalbayaty/remmina-launcher"
 name = "Remmina Launcher"
-version = "1.0.2"
+version = "1.0.3"
 plugin_api = 3
 author = "aalbayaty"
 license = "MIT"
