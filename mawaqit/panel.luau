@@ -190,8 +190,8 @@ local function calDayCell(cell)
     color = textColor,
     fontWeight = cell.isToday and "bold" or "normal",
     fontSize = 14,
-    width = 32,
-    height = 40,
+    width = 40,
+    height = 32,
     tooltip = cell.eventAr,
   })
 
@@ -217,7 +217,7 @@ end
 -- Uses a transparent button so it stays invisible (a ui.box with no fill renders
 -- as a solid black rectangle in this theme).
 local function calBlankCell()
-  return ui.button({ text = "", variant = "ghost", fill = "transparent", radius = 999, width = 32, height = 40 })
+  return ui.button({ text = "", variant = "ghost", fill = "transparent", radius = 999, width = 40, height = 32 })
 end
 
 -- The 7-col day grid: `calendar.leadingBlanks` leading placeholder cells, then
