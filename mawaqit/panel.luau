@@ -40,6 +40,7 @@ end
 -- ── Task 5.2: Tabs + countdown card ──────────────────────────────────────────
 
 function M.buildTabs(activeTab)
+  local pad = { left = 16, right = 16 }
   return ui.row({ gap = 0 }, {
     ui.button({
       text = noctalia.tr("panel.tab.prayers"),
@@ -48,8 +49,8 @@ function M.buildTabs(activeTab)
       radiusBottomLeft = 999,
       radiusTopRight = 0,
       radiusBottomRight = 0,
-      padding = 8,
-      expand = true,
+      width = "50%",
+      padding = pad,
       onClick = "onTabPrayers",
     }),
     ui.button({
@@ -59,8 +60,8 @@ function M.buildTabs(activeTab)
       radiusBottomLeft = 0,
       radiusTopRight = 999,
       radiusBottomRight = 999,
-      padding = 8,
-      expand = true,
+      width = "50%",
+      padding = pad,
       onClick = "onTabCalendar",
     }),
   })
