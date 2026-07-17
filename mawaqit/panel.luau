@@ -79,9 +79,9 @@ function M.buildPrayerList(prayers)
   for _, p in ipairs(prayers or {}) do
     table.insert(rows, ui.row({ fill = rowFill(p.highlight), gap = 6, align = "center" }, {
       ui.glyph({ name = p.glyph or "building-mosque" }),
-      ui.label({ text = p.label, fontSize = 15 }),
+      ui.label({ text = p.label, fontSize = 17 }),
       ui.spacer(),
-      ui.label({ text = p.time or "—", fontSize = 15 }),
+      ui.label({ text = p.time or "—", fontSize = 17 }),
     }))
   end
   return ui.column({ gap = 4 }, rows)
@@ -184,8 +184,8 @@ local function calDayCell(cell)
     color = textColor,
     fontWeight = cell.isToday and "bold" or "normal",
     fontSize = 14,
-    width = 36,
-    height = 36,
+    width = 40,
+    height = 40,
     tooltip = cell.eventAr,
   })
 
@@ -197,12 +197,12 @@ local function calDayCell(cell)
     end
     if cell.gday then
       table.insert(extras, ui.label({ text = tostring(cell.gday), fontSize = 8,
-        color = cell.isToday and "on_primary/0.6" or "secondary/0.6", align = "right" }))
+        color = cell.isToday and "on_primary/0.6" or "secondary/0.6", align = "center" }))
     end
     table.insert(children, ui.row({ gap = 2, align = "center", justify = "center" }, extras))
   end
 
-  return ui.column({ gap = 0, align = "center" }, children)
+  return ui.column({ gap = 1, align = "center" }, children)
 end
 
 -- The 7-col day grid: `calendar.leadingBlanks` leading ui.spacer cells, then

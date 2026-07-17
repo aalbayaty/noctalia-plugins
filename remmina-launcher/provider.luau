@@ -62,19 +62,18 @@ function M.parseScanOutput(stdout)
 end
 
 -- Build the shell scan script. One `sh -c` pipeline emitting
--- `name|protocol|filepath` lines. Uses awk for a single-pass extraction
--- over all .remmina files (simpler + faster than v4's per-file FileView).
+-- `name|protocol|filepath` lines. Uses `find -exec awk` so awk runs once
+-- per file (the ENDFILE block fires reliably per file). An earlier
+-- `find -print0 | awk -v RS='\0'` form silently produced no output because
+-- ENDFILE doesn't fire correctly with NUL-separated records.
 function M.buildScanScript(remminaDir)
   local qDir = M.shellQuote(remminaDir)
-  -- find lists .remmina files; awk reads each, extracts first name= and
-  -- protocol= lines (stripping trailing CR), emits name|protocol|filepath.
-  return "find " .. qDir .. " -maxdepth 1 -name '*.remmina' -type f -print0 2>/dev/null" ..
-    " | awk -v RS='\\0' '" ..
-      "FNR==1{name=\"\";protocol=\"\"} " ..
-      "name==\"\" && /^[[:space:]]*name=/{sub(/^name=/,\"\"); gsub(/\\r$/,\"\"); name=$0} " ..
-      "/^[[:space:]]*protocol=/{sub(/^protocol=/,\"\"); gsub(/\\r$/,\"\"); protocol=$0} " ..
-      "ENDFILE{ if(name!=\"\") printf \"%s|%s|%s\\n\", name, protocol, FILENAME }" ..
-    "'"
+  return "find " .. qDir .. " -maxdepth 1 -name '*.remmina' -type f -exec awk '" ..
+    "FNR==1{name=\"\";protocol=\"\"} " ..
+    "/^[[:space:]]*name=/{sub(/^[[:space:]]*name=/,\"\"); gsub(/\\r$/,\"\"); name=$0} " ..
+    "/^[[:space:]]*protocol=/{sub(/^[[:space:]]*protocol=/,\"\"); gsub(/\\r$/,\"\"); protocol=$0} " ..
+    "END{if(name!=\"\") printf \"%s|%s|%s\\n\", name, protocol, FILENAME}" ..
+    "' {} \\; 2>/dev/null"
 end
 
 -- Format one connection as a LauncherResult row.
