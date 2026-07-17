@@ -39,17 +39,17 @@ end
 
 -- ── Task 5.2: Tabs + countdown card ──────────────────────────────────────────
 
--- Segmented tab bar: two equal-width halves inside one rounded container.
--- ui.button has no `radius` prop and Noctalia has no per-corner radius, so we
--- round only the OUTER sides by letting the container's `radius` clip its
--- children; the inner seam (gap = 0) stays flat. The active half's `primary`
--- fill lives on the clipped `ui.column` (not on the button's `variant`, whose
--- own fill would overflow the rounded corner and look square) — a transparent
--- `ghost` button inside is just the click target + label.
+-- Tab bar: two equal-width rounded halves with a small gap between them.
+-- ui.button has no `radius` prop and the container's radius doesn't clip child
+-- fills in this shell, so each half carries its OWN rounded fill on a ui.column
+-- (which supports fill + radius and renders children). Active = primary fill,
+-- inactive = translucent surface. A transparent `ghost` button inside is the
+-- click target + label.
 local function tabHalf(key, textKey, active, onClick)
   return ui.column({
     flexGrow = 1,
-    fill = active and "primary" or "#00000000",
+    fill = active and "primary" or "surface_variant/0.4",
+    radius = 999,
     align = "center",
     justify = "center",
   }, {
@@ -64,7 +64,7 @@ local function tabHalf(key, textKey, active, onClick)
 end
 
 function M.buildTabs(activeTab)
-  return ui.row({ gap = 0, radius = 999, fill = "surface_variant/0.4" }, {
+  return ui.row({ gap = 8 }, {
     tabHalf("tab_prayers", "panel.tab.prayers", activeTab == 0, "onTabPrayers"),
     tabHalf("tab_calendar", "panel.tab.calendar", activeTab == 1, "onTabCalendar"),
   })
