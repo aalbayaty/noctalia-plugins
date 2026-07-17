@@ -58,7 +58,7 @@ function M.buildCountdownCard(countdown, isRamadan)
   end
 
   table.insert(children, ui.label({ text = countdown.label or "", color = color }))
-  table.insert(children, ui.label({ text = countdown.text or "", fontSize = 26, fontWeight = "bold", color = color }))
+  table.insert(children, ui.label({ text = countdown.text or "", fontSize = 28, fontWeight = "bold", color = color }))
 
   return ui.box({ fill = color .. "/0.12", radius = 12, align = "center" }, {
     ui.column({ gap = 4, align = "center" }, children),
@@ -79,9 +79,9 @@ function M.buildPrayerList(prayers)
   for _, p in ipairs(prayers or {}) do
     table.insert(rows, ui.row({ fill = rowFill(p.highlight), gap = 6, align = "center" }, {
       ui.glyph({ name = p.glyph or "building-mosque" }),
-      ui.label({ text = p.label, fontSize = 17 }),
+      ui.label({ text = p.label, fontSize = 19 }),
       ui.spacer(),
-      ui.label({ text = p.time or "—", fontSize = 17 }),
+      ui.label({ text = p.time or "—", fontSize = 19 }),
     }))
   end
   return ui.column({ gap = 4 }, rows)
