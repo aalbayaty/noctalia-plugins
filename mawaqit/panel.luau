@@ -28,12 +28,12 @@ function M.buildDateRow(hijri, gregorian, onClick)
   if onClick then
     return ui.row({ justify = "space_between", align = "center" }, {
       ui.button({ text = gregorian or "", variant = "ghost", color = "secondary", fontSize = 18, onClick = onClick }),
-      ui.button({ text = hijriText, variant = "ghost", color = "secondary", fontFamily = M.FONT, fontSize = 18, onClick = onClick }),
+      ui.button({ text = hijriText, variant = "ghost", color = "secondary", fontFamily = M.FONT, fontSize = 24, onClick = onClick }),
     })
   end
   return ui.row({ justify = "space_between", align = "center" }, {
     ui.label({ text = gregorian or "", color = "secondary", fontSize = 18 }),
-    ui.label({ text = hijriText, fontFamily = M.FONT, color = "secondary", fontSize = 18 }),
+    ui.label({ text = hijriText, fontFamily = M.FONT, color = "secondary", fontSize = 24 }),
   })
 end
 
