@@ -41,8 +41,8 @@ end
 
 function M.buildTabs(activeTab)
   return ui.row({ gap = 4 }, {
-    ui.button({ text = noctalia.tr("panel.tab.prayers"), variant = (activeTab == 0) and "primary" or "ghost", radius = 999, onClick = "onTabPrayers" }),
-    ui.button({ text = noctalia.tr("panel.tab.calendar"), variant = (activeTab == 1) and "primary" or "ghost", radius = 999, onClick = "onTabCalendar" }),
+    ui.button({ text = noctalia.tr("panel.tab.prayers"), variant = (activeTab == 0) and "primary" or "ghost", radius = 999, expand = true, height = 34, fontSize = 14, onClick = "onTabPrayers" }),
+    ui.button({ text = noctalia.tr("panel.tab.calendar"), variant = (activeTab == 1) and "primary" or "ghost", radius = 999, expand = true, height = 34, fontSize = 14, onClick = "onTabCalendar" }),
   })
 end
 
