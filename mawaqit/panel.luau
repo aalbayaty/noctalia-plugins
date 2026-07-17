@@ -27,13 +27,13 @@ function M.buildDateRow(hijri, gregorian, onClick)
   local hijriText = (hijri.displayAr ~= nil and hijri.displayAr ~= "") and hijri.displayAr or (hijri.display or "")
   if onClick then
     return ui.row({ justify = "space_between", align = "center" }, {
-      ui.button({ text = gregorian or "", variant = "ghost", color = "secondary", onClick = onClick }),
-      ui.button({ text = hijriText, variant = "ghost", color = "secondary", fontFamily = M.FONT, onClick = onClick }),
+      ui.button({ text = gregorian or "", variant = "ghost", color = "secondary", fontSize = 18, onClick = onClick }),
+      ui.button({ text = hijriText, variant = "ghost", color = "secondary", fontFamily = M.FONT, fontSize = 18, onClick = onClick }),
     })
   end
   return ui.row({ justify = "space_between", align = "center" }, {
-    ui.label({ text = gregorian or "", color = "secondary" }),
-    ui.label({ text = hijriText, fontFamily = M.FONT, color = "secondary" }),
+    ui.label({ text = gregorian or "", color = "secondary", fontSize = 18 }),
+    ui.label({ text = hijriText, fontFamily = M.FONT, color = "secondary", fontSize = 18 }),
   })
 end
 
@@ -41,8 +41,8 @@ end
 
 function M.buildTabs(activeTab)
   return ui.row({ gap = 4 }, {
-    ui.button({ text = noctalia.tr("panel.tab.prayers"), variant = (activeTab == 0) and "primary" or "ghost", onClick = "onTabPrayers" }),
-    ui.button({ text = noctalia.tr("panel.tab.calendar"), variant = (activeTab == 1) and "primary" or "ghost", onClick = "onTabCalendar" }),
+    ui.button({ text = noctalia.tr("panel.tab.prayers"), variant = (activeTab == 0) and "primary" or "ghost", radius = 999, onClick = "onTabPrayers" }),
+    ui.button({ text = noctalia.tr("panel.tab.calendar"), variant = (activeTab == 1) and "primary" or "ghost", radius = 999, onClick = "onTabCalendar" }),
   })
 end
 
@@ -59,7 +59,7 @@ function M.buildCountdownCard(countdown, isRamadan)
   if countdown.mode == "now" and countdown.next then
     local arName = COUNTDOWN_NAMES_AR[countdown.next] or ""
     if arName ~= "" then
-      table.insert(children, ui.label({ text = "حان الآن موعد صلاة " .. arName, color = color, fontFamily = M.FONT }))
+      table.insert(children, ui.label({ text = "حان الآن موعد صلاة " .. arName, color = color, fontFamily = M.FONT, fontSize = 16 }))
     end
   end
 
@@ -292,9 +292,7 @@ end
 function M.buildCalendarTab(calendar, hijri, gregorian, hadith)
   calendar = calendar or {}
   local showLast10 = calIsLastTenNights(hijri)
-  local dateRow = M.buildDateRow(hijri, gregorian, "onCalToday")
   return ui.column({ gap = 8 }, {
-    dateRow,
     M.buildCalNav(calendar),
     M.buildCalWeekdayHeader(calendar.weekStartDay),
     ui.separator({}),
@@ -314,13 +312,13 @@ function M.buildTree(state, activeTab)
   state = state or {}
   local children = {
     M.buildHeader(),
+    M.buildDateRow(state.hijri, state.gregorian, "onCalToday"),
     M.buildTabs(activeTab),
     M.buildHint(state.event),
   }
   if activeTab == 1 then
     table.insert(children, M.buildCalendarTab(state.calendar, state.hijri, state.gregorian, state.hadith))
   else
-    table.insert(children, M.buildDateRow(state.hijri, state.gregorian))
     table.insert(children, M.buildStatus(state.status, state.error))
     table.insert(children, M.buildCountdownCard(state.countdown, state.isRamadan))
     table.insert(children, M.buildPrayerList(state.prayers))
@@ -416,6 +414,10 @@ function onTabPrayers()
 end
 
 function onTabCalendar()
+  if _activeTab == 1 then
+    onCalToday()
+    return
+  end
   _activeTab = 1
   noctalia.state.set("command", { action = "calendar", ts = os.time(), month = _viewMonth, year = _viewYear })
   M._render()

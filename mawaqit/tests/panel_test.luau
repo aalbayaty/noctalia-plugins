@@ -9,13 +9,14 @@ H.test("header buttons", function()
   local names = {} for _, b in ipairs(btns) do names[b.props.onClick or ""] = true end
   H.ok(names["onRefresh"], "refresh cb"); H.ok(names["onClosePanel"], "close cb")
 end)
-H.test("date row prefers arabic hijri", function()
+H.test("date row prefers arabic hijri and is larger", function()
   local r = M.buildDateRow({ display = "1 Muharram 1448 AH", displayAr = "١ محرم ١٤٤٨" }, "16 Jul 2026")
   local found = H.find(r, function(n) return n.type == "label" and n.props.text == "١ محرم ١٤٤٨" end)
   H.truthy(found, "arabic hijri shown")
+  H.eq(found.props.fontSize, 18, "hijri date enlarged")
 end)
 
-H.test("tabs render two buttons with active variant", function()
+H.test("tabs render two rounded buttons with active variant", function()
   local t0 = M.buildTabs(0)
   local btns = H.findAll(t0, function(n) return n.type == "button" end)
   H.eq(#btns, 2, "two tab buttons")
@@ -23,6 +24,8 @@ H.test("tabs render two buttons with active variant", function()
   H.eq(btns[2].props.variant, "ghost", "calendar inactive")
   H.eq(btns[1].props.onClick, "onTabPrayers", "prayers cb")
   H.eq(btns[2].props.onClick, "onTabCalendar", "calendar cb")
+  H.eq(btns[1].props.radius, 999, "prayers tab rounded")
+  H.eq(btns[2].props.radius, 999, "calendar tab rounded")
   local t1 = M.buildTabs(1)
   local btns1 = H.findAll(t1, function(n) return n.type == "button" end)
   H.eq(btns1[1].props.variant, "ghost", "prayers inactive when tab1")
@@ -42,6 +45,7 @@ H.test("countdown card shows Arabic now line when mode is now", function()
   local card = M.buildCountdownCard(cd, false)
   local nowLine = H.find(card, function(n) return n.type == "label" and n.props.text and n.props.text:find("حان الآن") ~= nil end)
   H.truthy(nowLine, "arabic now line present")
+  H.eq(nowLine.props.fontSize, 16, "arabic now line enlarged")
 end)
 H.test("countdown card omits Arabic now line otherwise", function()
   local cd = { text = "Fajr 10m", color = "primary", mode = "countdown", label = "Fajr", next = "Fajr" }
@@ -202,10 +206,22 @@ H.test("buildCalNav month label is primary during Ramadan, default otherwise", f
   H.eq(muharramLabel.props.color, nil, "non-ramadan month label keeps default color")
 end)
 
-H.test("buildCalendarTab date row is clickable and goes back to today", function()
-  local tree = M.buildCalendarTab(makeCalendar(), { day = 5, month = 1, year = 1448, days = 30 }, "16 Jul 2026", nil)
+H.test("top date row is clickable and goes back to today", function()
+  local tree = M.buildTree({ hijri = { displayAr = "١ محرم ١٤٤٨" }, gregorian = "16 Jul 2026" }, 0)
   local todayBtn = H.find(tree, function(n) return n.type == "button" and n.props.onClick == "onCalToday" end)
-  H.truthy(todayBtn, "date row in calendar tab is clickable for onCalToday")
+  H.truthy(todayBtn, "top date row is clickable for onCalToday")
+  H.eq(todayBtn.props.fontSize, 18, "top date row is enlarged")
+end)
+
+H.test("onTabCalendar re-click resets to today", function()
+  H.state.set("hijri", { day = 1, month = 3, year = 1448, days = 30 })
+  H.env.onOpen({})
+  H.env.onTabCalendar() -- switch to calendar
+  H.eq(H.calls.command.action, "calendar", "first click switches to calendar")
+  H.env.onCalNext(); H.env.onCalNext() -- move away
+  H.env.onTabCalendar() -- re-click resets
+  H.eq(H.calls.command.month, 3, "re-click resets to current month")
+  H.eq(H.calls.command.year, 1448, "re-click resets to current year")
 end)
 
 H.test("buildCalendarTab renders the hadith block", function()
@@ -233,6 +249,7 @@ H.test("buildCalendarTab sync label reflects synced vs estimated state", functio
 end)
 
 H.test("panel interactions", function()
+  H.env.onTabPrayers() -- ensure we start from the prayer tab
   H.state.set("status", "ok")
   H.state.set("prayers", { { key="Fajr", label="Fajr", time="02:50", isNext=true, highlight="next" } })
   H.state.set("countdown", { text = "Fajr 10m", color = "primary", mode = "countdown", label = "Fajr", next = "Fajr" })
