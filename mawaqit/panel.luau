@@ -41,8 +41,8 @@ end
 
 function M.buildTabs(activeTab)
   return ui.row({ gap = 4 }, {
-    ui.button({ text = noctalia.tr("panel.tab.prayers"), variant = (activeTab == 0) and "primary" or "ghost", radius = 999, expand = true, height = 34, fontSize = 14, onClick = "onTabPrayers" }),
-    ui.button({ text = noctalia.tr("panel.tab.calendar"), variant = (activeTab == 1) and "primary" or "ghost", radius = 999, expand = true, height = 34, fontSize = 14, onClick = "onTabCalendar" }),
+    ui.button({ text = noctalia.tr("panel.tab.prayers"), variant = (activeTab == 0) and "primary" or "ghost", radius = 999, expand = true, onClick = "onTabPrayers" }),
+    ui.button({ text = noctalia.tr("panel.tab.calendar"), variant = (activeTab == 1) and "primary" or "ghost", radius = 999, expand = true, onClick = "onTabCalendar" }),
   })
 end
 
@@ -189,9 +189,9 @@ local function calDayCell(cell)
     text = tostring(cell.hday),
     color = textColor,
     fontWeight = cell.isToday and "bold" or "normal",
-    fontSize = 14,
-    width = 40,
-    height = 40,
+    fontSize = 13,
+    width = 32,
+    height = 32,
     tooltip = cell.eventAr,
   })
 
@@ -212,12 +212,12 @@ local function calDayCell(cell)
 end
 
 -- The 7-col day grid: `calendar.leadingBlanks` leading ui.spacer cells, then
--- A blank placeholder that occupies the same 40×40 footprint as a day cell so
--- the 7-column grid stays aligned and ragged rows don't collapse or spread.
+-- A blank placeholder that occupies the same footprint as a day cell so the
+-- 7-column grid stays aligned and ragged rows don't collapse or spread.
 -- Uses a transparent button so it stays invisible (a ui.box with no fill renders
 -- as a solid black rectangle in this theme).
 local function calBlankCell()
-  return ui.button({ text = "", variant = "ghost", fill = "transparent", radius = 999, width = 40, height = 40 })
+  return ui.button({ text = "", variant = "ghost", fill = "transparent", radius = 999, width = 32, height = 32 })
 end
 
 -- The 7-col day grid: `calendar.leadingBlanks` leading placeholder cells, then

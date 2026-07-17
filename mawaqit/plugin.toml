@@ -1,6 +1,6 @@
 id = "aalbayaty/mawaqit"
 name = "Mawaqit"
-version = "2.0.13"
+version = "2.0.14"
 plugin_api = 3
 min_noctalia = "5.0.0"
 author = "aalbayaty"
