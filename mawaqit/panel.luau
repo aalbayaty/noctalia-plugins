@@ -9,9 +9,13 @@ M.FONT = nil
 -- ── Task 5.1: Header + date row ──────────────────────────────────────────────
 
 function M.buildHeader()
+  local city = noctalia.getConfig("city") or ""
   return ui.row({ gap = 8, align = "center" }, {
     ui.glyph({ name = "building-mosque", color = "primary" }),
-    ui.label({ text = noctalia.tr("panel.title"), fontWeight = "bold" }),
+    ui.column({ gap = 0 }, {
+      ui.label({ text = noctalia.tr("panel.title"), fontWeight = "bold" }),
+      (city ~= "") and ui.label({ text = city, color = "secondary", fontSize = 12 }) or ui.spacer(),
+    }),
     ui.spacer(),
     ui.button({ glyph = "refresh", onClick = "onRefresh" }),
     ui.button({ glyph = "x", onClick = "onClosePanel" }),
@@ -162,9 +166,8 @@ function M.buildCalWeekdayHeader(weekStartDay)
   return ui.row({ justify = "space_between" }, cells)
 end
 
--- One day cell. Uses ui.button (not ui.box) as the cell wrapper so the nested
--- event-dot ui.box doesn't collide with the wrapper's own node type when
--- counting/finding cells in tests.
+-- One day cell: a column containing a circular day button plus an optional
+-- row with an event dot and the gregorian overlay.
 local function calDayCell(cell)
   local textColor = nil
   if cell.isToday then textColor = "on_primary"
@@ -173,23 +176,30 @@ local function calDayCell(cell)
   elseif cell.eventAr then textColor = "tertiary"
   end
 
-  local children = {
-    ui.label({ text = tostring(cell.hday), color = textColor, fontWeight = cell.isToday and "bold" or "normal", align = "center" }),
-  }
-  if cell.eventAr and not cell.isToday then
-    table.insert(children, ui.box({ fill = cell.isPast and "tertiary/0.3" or "tertiary", radius = 2, dot = true }))
-  end
-  if cell.gday then
-    table.insert(children, ui.label({ text = tostring(cell.gday), fontSize = 8,
-      color = cell.isToday and "on_primary/0.6" or "secondary/0.6", align = "right" }))
-  end
-
-  return ui.box({
+  local dayButton = ui.button({
     fill = cell.isToday and "primary" or "transparent",
     radius = 999,
     align = "center",
+    text = tostring(cell.hday),
+    color = textColor,
+    fontWeight = cell.isToday and "bold" or "normal",
     tooltip = cell.eventAr,
-  }, children)
+  })
+
+  local children = { dayButton }
+  if (cell.eventAr and not cell.isToday) or cell.gday then
+    local extras = {}
+    if cell.eventAr and not cell.isToday then
+      table.insert(extras, ui.box({ fill = cell.isPast and "tertiary/0.3" or "tertiary", radius = 2, dot = true }))
+    end
+    if cell.gday then
+      table.insert(extras, ui.label({ text = tostring(cell.gday), fontSize = 8,
+        color = cell.isToday and "on_primary/0.6" or "secondary/0.6", align = "right" }))
+    end
+    table.insert(children, ui.row({ gap = 2, align = "center", justify = "center" }, extras))
+  end
+
+  return ui.column({ gap = 0, align = "center" }, children)
 end
 
 -- The 7-col day grid: `calendar.leadingBlanks` leading ui.spacer cells, then

@@ -143,9 +143,8 @@ end
 H.test("buildCalGrid child count == full 7-col rows (leadingBlanks + #cells, padded)", function()
   local cal = makeCalendar()
   local grid = M.buildCalGrid(cal)
-  local rows = H.findAll(grid, function(n) return n.type == "row" end)
   local count = 0
-  for _, row in ipairs(rows) do count = count + #row.children end
+  for _, row in ipairs(grid.children or {}) do count = count + #(row.children or {}) end
   local filledCount = cal.leadingBlanks + #cal.cells
   local expected = math.ceil(filledCount / 7) * 7
   H.eq(count, expected, "padded to a multiple of 7")
@@ -154,17 +153,17 @@ end)
 H.test("buildCalGrid rows are all exactly 7 cells wide (rectangle, no ragged last row)", function()
   local cal = makeCalendar()
   local grid = M.buildCalGrid(cal)
-  local rows = H.findAll(grid, function(n) return n.type == "row" end)
+  local rows = grid.children or {}
   H.ok(#rows > 0, "grid has rows")
   for i, row in ipairs(rows) do
-    H.eq(#row.children, 7, "row " .. i .. " has exactly 7 children")
+    H.eq(#(row.children or {}), 7, "row " .. i .. " has exactly 7 children")
   end
 end)
 
 H.test("buildCalGrid today cell gets the primary circle fill", function()
   local cal = makeCalendar()
   local grid = M.buildCalGrid(cal)
-  local today = H.find(grid, function(n) return n.type == "box" and n.props.fill == "primary" end)
+  local today = H.find(grid, function(n) return n.type == "button" and n.props.fill == "primary" end)
   H.truthy(today, "today cell filled primary")
 end)
 

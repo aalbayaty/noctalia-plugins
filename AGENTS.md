@@ -80,6 +80,9 @@ Enforced by `validate-plugins.py` (the CI gate):
 - `--!nonstrict` at the top of every `.luau` file.
 - `catalog.toml` is auto-generated — never hand-edit, don't commit it (CI regenerates on push
   to `main` in the official repo; run `update-catalog.py` locally in forks).
+- **Bump `version` in `plugin.toml` for every plugin change you want Noctalia to notice.**
+  The shell uses the version to detect updates, so after editing code, settings, or assets,
+  increment the semver patch (or appropriate level), regenerate `catalog.toml`, and commit both.
 - Don't edit non-English translation files (`fr.json`, `tr.json`, `ar.json`) unless the PR is
   explicitly for translation work. Add new strings to `en.json` only; run `i18n_parity.py` to
   verify other locales catch up.
