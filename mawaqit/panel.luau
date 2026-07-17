@@ -40,7 +40,7 @@ end
 -- ── Task 5.2: Tabs + countdown card ──────────────────────────────────────────
 
 function M.buildTabs(activeTab)
-  return ui.row({ gap = 0, radius = 999, fill = "surface_variant/0.5", border = "outline", borderWidth = 1 }, {
+  return ui.row({ gap = 6 }, {
     ui.button({
       key = "tab_prayers",
       text = noctalia.tr("panel.tab.prayers"),
@@ -184,10 +184,12 @@ function M.buildCalWeekdayHeader(weekStartDay)
   return ui.row({ justify = "space_between" }, cells)
 end
 
--- One day cell: a ui.box (supports fill/radius) containing a column with the
--- day number label and an optional event-dot + gregorian-overlay row.
--- ui.button does NOT support fill/radius/color/fontWeight — those are silently
--- ignored — so we use ui.box + ui.label instead.
+-- One day cell: a ui.column with fill/radius (both supported on column/row,
+-- which — unlike ui.box — also render their children) holding the day number
+-- label and an optional event-dot + gregorian-overlay row.
+-- ui.button does NOT support fill/radius/color/fontWeight (silently ignored),
+-- and ui.box is a leaf visual that ignores children, so ui.column is the right
+-- container for a filled, rounded cell that shows text.
 local function calDayCell(cell)
   local textColor = nil
   if cell.isToday then textColor = "on_primary"
@@ -217,23 +219,22 @@ local function calDayCell(cell)
     table.insert(children, ui.row({ gap = 2, align = "center", justify = "center" }, extras))
   end
 
-  return ui.box({
+  return ui.column({
     fill = cell.isToday and "primary" or "#00000000",
     radius = 999,
     width = 40,
     height = 32,
-  }, {
-    ui.column({ gap = 1, align = "center" }, children)
-  })
+    align = "center",
+    justify = "center",
+    gap = 1,
+  }, children)
 end
 
--- The 7-col day grid: `calendar.leadingBlanks` leading ui.spacer cells, then
 -- A blank placeholder that occupies the same 40×32 footprint as a day cell so
--- the 7-column grid stays aligned. Uses #00000000 (alpha 0) for true transparency
--- since "transparent" is not a valid palette role and ui.box with no fill renders
--- as a solid rectangle in this theme.
+-- the 7-column grid stays aligned. Uses #00000000 (alpha 0) for true
+-- transparency ("transparent" is not a valid palette role).
 local function calBlankCell()
-  return ui.box({ width = 40, height = 32, fill = "#00000000" })
+  return ui.column({ width = 40, height = 32, fill = "#00000000" })
 end
 
 -- The 7-col day grid: `calendar.leadingBlanks` leading placeholder cells, then
