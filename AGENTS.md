@@ -5,9 +5,15 @@ Guidance for AI agents working in this repo. Read before editing.
 ## What this is
 
 Multi-plugin monorepo for Noctalia **v5** desktop-shell plugins (Luau). Each plugin is one
-top-level directory (`mawaqit/` is the only one so far). Shared root files — `noctalia.d.luau`,
-`.luaurc`, `.vscode/`, `.github/` — serve every plugin. See `README.md` for the overview and
-`docs/superpowers/specs/2026-07-16-mawaqit-v5-port-design.md` for the full plugin architecture.
+top-level directory. Current plugins:
+
+- `mawaqit/` — Muslim prayer times, countdown, notifications, Hijri calendar.
+- `remmina-launcher/` — Remmina remote-desktop connection launcher.
+- `steam-launcher/` — Installed Steam game launcher.
+
+Shared root files — `noctalia.d.luau`, `.luaurc`, `.vscode/`, `.github/` — serve every plugin.
+See `README.md` for the overview and `docs/superpowers/specs/2026-07-16-mawaqit-v5-port-design.md`
+for the full `mawaqit` plugin architecture.
 
 ## Commands
 
@@ -15,11 +21,11 @@ All commands run from the **repo root**.
 
 | Task | Command |
 | --- | --- |
-| Run one test file | `luau mawaqit/tests/logic_test.luau` |
+| Run one test file | `luau <plugin>/tests/<name>_test.luau` (e.g. `luau mawaqit/tests/logic_test.luau`) |
 | Validate manifests (CI gate) | `python3 .github/workflows/validate-plugins.py` |
 | Regenerate `catalog.toml` | `python3 .github/workflows/update-catalog.py` |
-| Check translation parity | `python3 mawaqit/tests/i18n_parity.py` |
-| Typecheck/lint one file | `luau-analyze mawaqit/service.luau` |
+| Check translation parity | `python3 <plugin>/tests/i18n_parity.py` (if the plugin has one) |
+| Typecheck/lint one file | `luau-analyze <plugin>/<entry>.luau` (e.g. `luau-analyze mawaqit/service.luau`) |
 
 There is no test runner — each `*_test.luau` is a standalone script that prints `PASS:`/`FAIL:`
 and exits non-zero on failure. Run each file individually (`luau` takes one file).
@@ -29,14 +35,14 @@ and exits non-zero on failure. Run each file individually (`luau` takes one file
 globals are host-injected at runtime and expected — filter them out. Any **other** diagnostic
 is a real failure.
 
-**`i18n_parity.py` caveat:** uses a CWD-relative path (`mawaqit/translations`); must run from
-the repo root, not from inside `mawaqit/`.
+**`i18n_parity.py` caveat:** uses a CWD-relative path (`<plugin>/translations`); must run from
+the repo root, not from inside the plugin directory.
 
 ## Architecture
 
-- **No `require` at runtime.** The Noctalia shell loads each entry (`service.luau`,
-  `widget.luau`, `panel.luau`) into an isolated sandbox without `require`. Entries cannot
-  share Lua memory.
+- **No `require` at runtime.** The Noctalia shell loads each entry (e.g. `service.luau`,
+  `widget.luau`, `panel.luau`, or `provider.luau` for launcher providers) into an isolated
+  sandbox without `require`. Entries cannot share Lua memory.
 - **`service.luau` owns all logic** — fetch, parse, countdown, Hijri calendar, events,
   notifications. `widget.luau` and `panel.luau` are thin renderers that read pre-computed,
   display-ready values from `noctalia.state` and send commands back. Do not duplicate logic
@@ -51,10 +57,12 @@ the repo root, not from inside `mawaqit/`.
 Tests run under the local `luau` CLI, not the Noctalia shell. Two techniques make off-shell
 testing work:
 
-1. **Test export guard.** Each entry ends with
-   `if _G.__MAWAQIT_TEST then return { …internals… } end`. In production the flag is nil (guard
-   skipped, no return). In tests the harness sets the flag, `require` returns the internal
-   function table, and assertions run against pure functions with no network/time dependence.
+1. **Test export guard.** Each entry ends with a plugin-specific guard such as
+   `if _G.__MAWAQIT_TEST then return { …internals… } end` or
+   `if _G.__REMMINA_TEST or noctalia == nil then return M end`.
+   In production the flag is nil (guard skipped, no return). In tests the harness sets the flag,
+   `require` returns the internal function table or module, and assertions run against pure
+   functions with no network/time dependence.
 2. **Mock-global harness** (`tests/harness.luau`). Installs stub `noctalia`, `ui`,
    `barWidget`, `panel` globals that record calls and return `{type, props, children}` nodes
    from `ui.*`. `H.loadEntry("../service")` requires the entry, finds its env via `getfenv`
@@ -89,5 +97,7 @@ Enforced by `validate-plugins.py` (the CI gate):
 - Settings UI is 100% auto-generated from `plugin.toml` `[[setting]]` — no settings code, no
   `setConfig` (plugins read via `noctalia.getConfig`, can't write settings).
 - Commit messages use conventional commits with plugin scope: `feat(mawaqit):`,
-  `fix(mawaqit):`, `test(mawaqit):`, `i18n(mawaqit):`, `assets(mawaqit):`, `chore:`.
+  `fix(mawaqit):`, `test(mawaqit):`, `i18n(mawaqit):`, `assets(mawaqit):`,
+  `feat(remmina-launcher):`, `fix(remmina-launcher):`, `feat(steam-launcher):`,
+  `fix(steam-launcher):`, `chore:`.
 - Default branch is `main`; no develop/staging branches.

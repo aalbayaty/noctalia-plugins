@@ -9,6 +9,8 @@ editor support and CI for all of them.
 | Plugin | Description |
 | --- | --- |
 | [`mawaqit/`](./mawaqit) | Muslim prayer times: live countdown, notifications, Hijri calendar with Islamic events. |
+| [`remmina-launcher/`](./remmina-launcher) | Browse and launch Remmina remote-desktop connections from the launcher. |
+| [`steam-launcher/`](./steam-launcher) | Browse and launch installed Steam games from the launcher. |
 
 ## How to add a plugin
 
