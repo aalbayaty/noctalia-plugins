@@ -214,8 +214,9 @@ end
 -- The 7-col day grid: `calendar.leadingBlanks` leading ui.spacer cells, then
 -- A blank placeholder that occupies the same 40×40 footprint as a day cell so
 -- the 7-column grid stays aligned and ragged rows don't collapse or spread.
+-- No fill so it stays transparent.
 local function calBlankCell()
-  return ui.box({ width = 40, height = 40, fill = "transparent" })
+  return ui.box({ width = 40, height = 40 })
 end
 
 -- The 7-col day grid: `calendar.leadingBlanks` leading placeholder cells, then

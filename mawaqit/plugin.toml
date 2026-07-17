@@ -1,6 +1,6 @@
 id = "aalbayaty/mawaqit"
 name = "Mawaqit"
-version = "2.0.9"
+version = "2.0.10"
 plugin_api = 3
 min_noctalia = "5.0.0"
 author = "aalbayaty"
@@ -22,7 +22,7 @@ entry = "widget.luau"
 id = "panel"
 entry = "panel.luau"
 width = 360
-height = 520
+height = 560
 placement = "floating"
 position = "top_center"
 
