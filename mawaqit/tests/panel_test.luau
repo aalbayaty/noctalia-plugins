@@ -202,20 +202,15 @@ H.test("buildCalNav month label is primary during Ramadan, default otherwise", f
   H.eq(muharramLabel.props.color, nil, "non-ramadan month label keeps default color")
 end)
 
-H.test("buildCalendarTab hides back-to-today on the current month, shows it otherwise", function()
-  local cal = makeCalendar()
-  local hijriCurrent = { day = 5, month = 1, year = 1448, days = 30 }
-  local treeCurrent = M.buildCalendarTab(cal, hijriCurrent, nil)
-  H.eq(H.find(treeCurrent, function(n) return n.props.onClick == "onCalToday" end), nil, "no back-to-today on current month")
-
-  local hijriOther = { day = 5, month = 2, year = 1448, days = 29 }
-  local treeOther = M.buildCalendarTab(cal, hijriOther, nil)
-  H.truthy(H.find(treeOther, function(n) return n.props.onClick == "onCalToday" end), "back-to-today shown off the current month")
+H.test("buildCalendarTab date row is clickable and goes back to today", function()
+  local tree = M.buildCalendarTab(makeCalendar(), { day = 5, month = 1, year = 1448, days = 30 }, "16 Jul 2026", nil)
+  local dateRow = H.find(tree, function(n) return n.type == "row" and n.props.onClick == "onCalToday" end)
+  H.truthy(dateRow, "date row in calendar tab is clickable for onCalToday")
 end)
 
 H.test("buildCalendarTab renders the hadith block", function()
   local cal = makeCalendar()
-  local tree = M.buildCalendarTab(cal, { day = 5, month = 1, year = 1448, days = 30 }, { text = "hadith text", source = "البخاري" })
+  local tree = M.buildCalendarTab(cal, { day = 5, month = 1, year = 1448, days = 30 }, "16 Jul 2026", { text = "hadith text", source = "البخاري" })
   H.truthy(H.find(tree, function(n) return n.type == "label" and n.props.text == "hadith text" end), "hadith text shown")
   H.truthy(H.find(tree, function(n) return n.type == "label" and n.props.text == "― البخاري" end), "hadith source shown")
 end)
@@ -223,7 +218,7 @@ end)
 H.test("buildCalendarTab shows the last-10-nights banner and suppresses hadith during it", function()
   local cal = makeCalendar({ month = 9, monthNameEn = "Ramadan" })
   local hijri = { day = 22, month = 9, year = 1448, days = 30 }
-  local tree = M.buildCalendarTab(cal, hijri, { text = "hadith text", source = "البخاري" })
+  local tree = M.buildCalendarTab(cal, hijri, "16 Jul 2026", { text = "hadith text", source = "البخاري" })
   H.truthy(H.find(tree, function(n) return n.type == "label" and n.props.text and n.props.text:find("العشر الأواخر") ~= nil end),
     "last-10-nights banner shown")
   H.eq(H.find(tree, function(n) return n.type == "label" and n.props.text == "hadith text" end), nil,
@@ -231,8 +226,8 @@ H.test("buildCalendarTab shows the last-10-nights banner and suppresses hadith d
 end)
 
 H.test("buildCalendarTab sync label reflects synced vs estimated state", function()
-  local t1 = M.buildCalendarTab(makeCalendar({ synced = true }), { day = 5, month = 1, year = 1448, days = 30 }, nil)
-  local t2 = M.buildCalendarTab(makeCalendar({ synced = false }), { day = 5, month = 1, year = 1448, days = 30 }, nil)
+  local t1 = M.buildCalendarTab(makeCalendar({ synced = true }), { day = 5, month = 1, year = 1448, days = 30 }, "16 Jul 2026", nil)
+  local t2 = M.buildCalendarTab(makeCalendar({ synced = false }), { day = 5, month = 1, year = 1448, days = 30 }, "16 Jul 2026", nil)
   H.truthy(H.find(t1, function(n) return n.type == "label" and n.props.text == "calendar.sync" end), "synced label key")
   H.truthy(H.find(t2, function(n) return n.type == "label" and n.props.text == "calendar.approximate" end), "estimate label key")
 end)

@@ -272,15 +272,17 @@ function M.buildCalSyncLabel(calendar)
   return ui.label({ text = text, color = "secondary", align = "center" })
 end
 
--- M.buildCalendarTab(calendar, hijri, hadith) — full calendar tab: nav row,
--- back-to-today, weekday header, 7-col grid, today's-event line,
+-- M.buildCalendarTab(calendar, hijri, gregorian, hadith) — full calendar tab:
+-- date row, nav row, weekday header, 7-col grid, today's-event line,
 -- last-10-nights banner, hadith block, and the sync-status label.
-function M.buildCalendarTab(calendar, hijri, hadith)
+function M.buildCalendarTab(calendar, hijri, gregorian, hadith)
   calendar = calendar or {}
   local showLast10 = calIsLastTenNights(hijri)
+  local dateRow = M.buildDateRow(hijri, gregorian)
+  dateRow.props.onClick = "onCalToday"
   return ui.column({ gap = 8 }, {
+    dateRow,
     M.buildCalNav(calendar),
-    M.buildCalBackToToday(calendar, hijri),
     M.buildCalWeekdayHeader(calendar.weekStartDay),
     ui.separator({}),
     M.buildCalGrid(calendar),
@@ -299,13 +301,13 @@ function M.buildTree(state, activeTab)
   state = state or {}
   local children = {
     M.buildHeader(),
-    M.buildDateRow(state.hijri, state.gregorian),
     M.buildTabs(activeTab),
     M.buildHint(state.event),
   }
   if activeTab == 1 then
-    table.insert(children, M.buildCalendarTab(state.calendar, state.hijri, state.hadith))
+    table.insert(children, M.buildCalendarTab(state.calendar, state.hijri, state.gregorian, state.hadith))
   else
+    table.insert(children, M.buildDateRow(state.hijri, state.gregorian))
     table.insert(children, M.buildStatus(state.status, state.error))
     table.insert(children, M.buildCountdownCard(state.countdown, state.isRamadan))
     table.insert(children, M.buildPrayerList(state.prayers))
