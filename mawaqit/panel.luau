@@ -40,28 +40,19 @@ end
 -- ── Task 5.2: Tabs + countdown card ──────────────────────────────────────────
 
 function M.buildTabs(activeTab)
-  local pad = { left = 16, right = 16 }
-  return ui.row({ gap = 0 }, {
+  return ui.row({ gap = 0, radius = 999, fill = "surface_variant/0.5", border = "outline", borderWidth = 1 }, {
     ui.button({
+      key = "tab_prayers",
       text = noctalia.tr("panel.tab.prayers"),
       variant = (activeTab == 0) and "primary" or "ghost",
-      radiusTopLeft = 999,
-      radiusBottomLeft = 999,
-      radiusTopRight = 0,
-      radiusBottomRight = 0,
-      width = "50%",
-      padding = pad,
+      flexGrow = 1,
       onClick = "onTabPrayers",
     }),
     ui.button({
+      key = "tab_calendar",
       text = noctalia.tr("panel.tab.calendar"),
       variant = (activeTab == 1) and "primary" or "ghost",
-      radiusTopLeft = 0,
-      radiusBottomLeft = 0,
-      radiusTopRight = 999,
-      radiusBottomRight = 999,
-      width = "50%",
-      padding = pad,
+      flexGrow = 1,
       onClick = "onTabCalendar",
     }),
   })
@@ -87,7 +78,7 @@ function M.buildCountdownCard(countdown, isRamadan)
   table.insert(children, ui.label({ text = countdown.label or "", color = color }))
   table.insert(children, ui.label({ text = countdown.text or "", fontSize = 28, fontWeight = "bold", color = color }))
 
-  return ui.box({ fill = color .. "/0.12", radius = 12, align = "center" }, {
+  return ui.box({ fill = color .. "/0.12", radius = 12 }, {
     ui.column({ gap = 4, align = "center" }, children),
   })
 end
@@ -160,7 +151,7 @@ function M.buildCalNav(calendar)
   return ui.row({ justify = "space_between", align = "center" }, {
     ui.button({ glyph = "chevron-left", onClick = "onCalPrev" }),
     ui.column({ gap = 1, align = "center" }, {
-      ui.label({ text = label, fontWeight = "bold", align = "center", color = isRamadan and "primary" or nil }),
+      ui.label({ text = label, fontWeight = "bold", textAlign = "center", color = isRamadan and "primary" or nil }),
       ui.row({ gap = 4, align = "center" }, {
         ui.glyph({ name = calendar.synced and "shield-check" or "calculator", color = calendar.synced and "primary" or "secondary" }),
         ui.label({ text = calendar.gregRange or "", color = "secondary" }),
@@ -193,8 +184,10 @@ function M.buildCalWeekdayHeader(weekStartDay)
   return ui.row({ justify = "space_between" }, cells)
 end
 
--- One day cell: a column containing a circular day button plus an optional
--- row with an event dot and the gregorian overlay.
+-- One day cell: a ui.box (supports fill/radius) containing a column with the
+-- day number label and an optional event-dot + gregorian-overlay row.
+-- ui.button does NOT support fill/radius/color/fontWeight — those are silently
+-- ignored — so we use ui.box + ui.label instead.
 local function calDayCell(cell)
   local textColor = nil
   if cell.isToday then textColor = "on_primary"
@@ -203,42 +196,44 @@ local function calDayCell(cell)
   elseif cell.eventAr then textColor = "tertiary"
   end
 
-  local dayButton = ui.button({
-    fill = cell.isToday and "primary" or "transparent",
-    radius = 999,
-    align = "center",
+  local dayLabel = ui.label({
     text = tostring(cell.hday),
     color = textColor,
     fontWeight = cell.isToday and "bold" or "normal",
     fontSize = 14,
-    width = 40,
-    height = 32,
-    tooltip = cell.eventAr,
+    textAlign = "center",
   })
 
-  local children = { dayButton }
+  local children = { dayLabel }
   if (cell.eventAr and not cell.isToday) or cell.gday then
     local extras = {}
     if cell.eventAr and not cell.isToday then
-      table.insert(extras, ui.box({ fill = cell.isPast and "tertiary/0.3" or "tertiary", radius = 2, dot = true }))
+      table.insert(extras, ui.box({ fill = cell.isPast and "tertiary/0.3" or "tertiary", radius = 2, width = 4, height = 4 }))
     end
     if cell.gday then
       table.insert(extras, ui.label({ text = tostring(cell.gday), fontSize = 8,
-        color = cell.isToday and "on_primary/0.6" or "secondary/0.6", align = "center" }))
+        color = cell.isToday and "on_primary/0.6" or "secondary/0.6", textAlign = "center" }))
     end
     table.insert(children, ui.row({ gap = 2, align = "center", justify = "center" }, extras))
   end
 
-  return ui.column({ gap = 1, align = "center" }, children)
+  return ui.box({
+    fill = cell.isToday and "primary" or "#00000000",
+    radius = 999,
+    width = 40,
+    height = 32,
+  }, {
+    ui.column({ gap = 1, align = "center" }, children)
+  })
 end
 
 -- The 7-col day grid: `calendar.leadingBlanks` leading ui.spacer cells, then
--- A blank placeholder that occupies the same footprint as a day cell so the
--- 7-column grid stays aligned and ragged rows don't collapse or spread.
--- Uses a transparent button so it stays invisible (a ui.box with no fill renders
--- as a solid black rectangle in this theme).
+-- A blank placeholder that occupies the same 40×32 footprint as a day cell so
+-- the 7-column grid stays aligned. Uses #00000000 (alpha 0) for true transparency
+-- since "transparent" is not a valid palette role and ui.box with no fill renders
+-- as a solid rectangle in this theme.
 local function calBlankCell()
-  return ui.button({ text = "", variant = "ghost", fill = "transparent", radius = 999, width = 40, height = 32 })
+  return ui.box({ width = 40, height = 32, fill = "#00000000" })
 end
 
 -- The 7-col day grid: `calendar.leadingBlanks` leading placeholder cells, then
@@ -279,13 +274,13 @@ function M.buildCalTodayEvent(calendar, hijri, showLast10)
   local cell = calendar.cells and hijri and calendar.cells[hijri.day]
   local eventAr = cell and cell.eventAr
   if not eventAr or eventAr == "" then return ui.spacer() end
-  return ui.label({ text = "🌙 " .. eventAr, color = "tertiary", fontFamily = M.FONT, align = "center" })
+  return ui.label({ text = "🌙 " .. eventAr, color = "tertiary", fontFamily = M.FONT, textAlign = "center" })
 end
 
 function M.buildCalLast10Banner(calendar, hijri, showLast10)
   if not (showLast10 and isCurrentCalMonth(calendar, hijri)) then return ui.spacer() end
   return ui.box({ fill = "primary/0.08", radius = 12 }, {
-    ui.label({ text = "العشر الأواخر\nأفضل ليالي رمضان، فيها ليلة القدر خير من ألف شهر", color = "primary", fontFamily = M.FONT, align = "center" }),
+    ui.label({ text = "العشر الأواخر\nأفضل ليالي رمضان، فيها ليلة القدر خير من ألف شهر", color = "primary", fontFamily = M.FONT, textAlign = "center" }),
   })
 end
 
@@ -293,8 +288,8 @@ function M.buildCalHadith(hadith, showLast10)
   if showLast10 or hadith == nil then return ui.spacer() end
   return ui.column({ gap = 2 }, {
     ui.separator({}),
-    ui.label({ text = hadith.text or "", fontFamily = M.FONT, align = "center" }),
-    ui.label({ text = (hadith.source ~= nil and hadith.source ~= "") and ("― " .. hadith.source) or "", color = "secondary", align = "center" }),
+    ui.label({ text = hadith.text or "", fontFamily = M.FONT, textAlign = "center" }),
+    ui.label({ text = (hadith.source ~= nil and hadith.source ~= "") and ("― " .. hadith.source) or "", color = "secondary", textAlign = "center" }),
   })
 end
 
@@ -322,7 +317,7 @@ function M.buildTree(state, activeTab)
   state = state or {}
   local children = {
     M.buildHeader(),
-    M.buildDateRow(state.hijri, state.gregorian, "onCalToday"),
+    M.buildDateRow(state.hijri, state.gregorian),
     M.buildTabs(activeTab),
     M.buildHint(state.event),
   }
