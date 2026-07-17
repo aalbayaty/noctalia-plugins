@@ -184,7 +184,7 @@ local function calDayCell(cell)
       color = cell.isToday and "on_primary/0.6" or "secondary/0.6", align = "right" }))
   end
 
-  return ui.button({
+  return ui.box({
     fill = cell.isToday and "primary" or "transparent",
     radius = 999,
     align = "center",

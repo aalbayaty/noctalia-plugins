@@ -143,10 +143,12 @@ end
 H.test("buildCalGrid child count == full 7-col rows (leadingBlanks + #cells, padded)", function()
   local cal = makeCalendar()
   local grid = M.buildCalGrid(cal)
-  local nodes = H.findAll(grid, function(n) return n.type == "spacer" or n.type == "button" end)
+  local rows = H.findAll(grid, function(n) return n.type == "row" end)
+  local count = 0
+  for _, row in ipairs(rows) do count = count + #row.children end
   local filledCount = cal.leadingBlanks + #cal.cells
   local expected = math.ceil(filledCount / 7) * 7
-  H.eq(#nodes, expected, "padded to a multiple of 7")
+  H.eq(count, expected, "padded to a multiple of 7")
 end)
 
 H.test("buildCalGrid rows are all exactly 7 cells wide (rectangle, no ragged last row)", function()
@@ -162,7 +164,7 @@ end)
 H.test("buildCalGrid today cell gets the primary circle fill", function()
   local cal = makeCalendar()
   local grid = M.buildCalGrid(cal)
-  local today = H.find(grid, function(n) return n.type == "button" and n.props.fill == "primary" end)
+  local today = H.find(grid, function(n) return n.type == "box" and n.props.fill == "primary" end)
   H.truthy(today, "today cell filled primary")
 end)
 
@@ -257,9 +259,11 @@ H.test("onTabCalendar renders the calendar tab tree with a grid", function()
   H.env.onTabCalendar()
   local tree = H.calls.render
   -- Header alone contributes 2 buttons (refresh, close); a real calendar grid
-  -- (nav chevrons + 36 leadingBlanks/cells) pushes this well past that.
-  local buttonsAndSpacers = H.findAll(tree, function(n) return n.type == "spacer" or n.type == "button" end)
-  H.ok(#buttonsAndSpacers > 2, "grid rendered with cells, not just the Phase-5 placeholder")
+  -- (nav chevrons + day cells + spacers) pushes this well past that.
+  local cellsAndSpacers = H.findAll(tree, function(n)
+    return n.type == "spacer" or n.type == "button" or n.type == "box"
+  end)
+  H.ok(#cellsAndSpacers > 2, "grid rendered with cells, not just the Phase-5 placeholder")
   H.truthy(H.find(tree, function(n) return n.type == "button" and n.props.glyph == "chevron-left" end), "calendar nav row present")
   H.env.onTabPrayers()
 end)
