@@ -35,7 +35,7 @@ H.test("countdown card fill + big text", function()
   H.eq(card.props.fill, "primary/0.12", "fill from countdown color")
   local big = H.find(card, function(n) return n.type == "label" and n.props.text == "Fajr 10m" end)
   H.truthy(big, "big countdown text present")
-  H.eq(big.props.fontSize, 28, "big font size")
+  H.eq(big.props.fontSize, 22, "big font size")
 end)
 H.test("countdown card shows Arabic now line when mode is now", function()
   local cd = { text = "Fajr — Now", color = "primary", mode = "now", label = "Fajr", next = "Fajr" }

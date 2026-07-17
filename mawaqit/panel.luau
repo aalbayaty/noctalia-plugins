@@ -58,7 +58,7 @@ function M.buildCountdownCard(countdown, isRamadan)
   end
 
   table.insert(children, ui.label({ text = countdown.label or "", color = color }))
-  table.insert(children, ui.label({ text = countdown.text or "", fontSize = 28, fontWeight = "bold", color = color }))
+  table.insert(children, ui.label({ text = countdown.text or "", fontSize = 22, fontWeight = "bold", color = color }))
 
   return ui.box({ fill = color .. "/0.12", radius = 12, align = "center" }, {
     ui.column({ gap = 4, align = "center" }, children),
@@ -77,14 +77,14 @@ end
 function M.buildPrayerList(prayers)
   local rows = {}
   for _, p in ipairs(prayers or {}) do
-    table.insert(rows, ui.row({ fill = rowFill(p.highlight), gap = 8, align = "center" }, {
+    table.insert(rows, ui.row({ fill = rowFill(p.highlight), gap = 6, align = "center" }, {
       ui.glyph({ name = p.glyph or "building-mosque" }),
-      ui.label({ text = p.label }),
+      ui.label({ text = p.label, fontSize = 13 }),
       ui.spacer(),
-      ui.label({ text = p.time or "—" }),
+      ui.label({ text = p.time or "—", fontSize = 13 }),
     }))
   end
-  return ui.column({ gap = 6 }, rows)
+  return ui.column({ gap = 4 }, rows)
 end
 
 function M.buildHint(event)
@@ -183,6 +183,9 @@ local function calDayCell(cell)
     text = tostring(cell.hday),
     color = textColor,
     fontWeight = cell.isToday and "bold" or "normal",
+    fontSize = 18,
+    width = 44,
+    height = 44,
     tooltip = cell.eventAr,
   })
 
@@ -193,7 +196,7 @@ local function calDayCell(cell)
       table.insert(extras, ui.box({ fill = cell.isPast and "tertiary/0.3" or "tertiary", radius = 2, dot = true }))
     end
     if cell.gday then
-      table.insert(extras, ui.label({ text = tostring(cell.gday), fontSize = 8,
+      table.insert(extras, ui.label({ text = tostring(cell.gday), fontSize = 10,
         color = cell.isToday and "on_primary/0.6" or "secondary/0.6", align = "right" }))
     end
     table.insert(children, ui.row({ gap = 2, align = "center", justify = "center" }, extras))
@@ -307,7 +310,7 @@ function M.buildTree(state, activeTab)
     table.insert(children, M.buildCountdownCard(state.countdown, state.isRamadan))
     table.insert(children, M.buildPrayerList(state.prayers))
   end
-  return ui.column({ gap = 12 }, children)
+  return ui.column({ gap = 8 }, children)
 end
 
 -- Local UI-only state: active tab (0 = prayers, 1 = calendar) and the
