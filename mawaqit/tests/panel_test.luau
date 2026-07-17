@@ -237,13 +237,6 @@ H.test("onTabCalendar re-click resets to today", function()
   H.eq(H.calls.command.year, 1448, "re-click resets to current year")
 end)
 
-H.test("buildCalendarTab sync label reflects synced vs estimated state", function()
-  local t1 = M.buildCalendarTab(makeCalendar({ synced = true }), { day = 5, month = 1, year = 1448, days = 30 }, "16 Jul 2026", nil)
-  local t2 = M.buildCalendarTab(makeCalendar({ synced = false }), { day = 5, month = 1, year = 1448, days = 30 }, "16 Jul 2026", nil)
-  H.truthy(H.find(t1, function(n) return n.type == "label" and n.props.text == "calendar.sync" end), "synced label key")
-  H.truthy(H.find(t2, function(n) return n.type == "label" and n.props.text == "calendar.approximate" end), "estimate label key")
-end)
-
 H.test("panel interactions", function()
   H.env.onTabPrayers() -- ensure we start from the prayer tab
   H.state.set("status", "ok")

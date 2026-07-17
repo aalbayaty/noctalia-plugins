@@ -297,19 +297,9 @@ function M.buildCalHadith(hadith, showLast10)
   })
 end
 
-function M.buildCalSyncLabel(calendar)
-  local text
-  if calendar.synced then
-    text = noctalia.tr("calendar.sync", { date = calendar.syncedAt or "" })
-  else
-    text = noctalia.tr("calendar.approximate")
-  end
-  return ui.label({ text = text, color = "secondary", align = "center" })
-end
-
 -- M.buildCalendarTab(calendar, hijri, gregorian, hadith) — full calendar tab:
--- date row, nav row, weekday header, 7-col grid, today's-event line,
--- last-10-nights banner, hadith block, and the sync-status label.
+-- nav row, weekday header, 7-col grid, today's-event line, and the
+-- last-10-nights banner.
 function M.buildCalendarTab(calendar, hijri, gregorian, hadith)
   calendar = calendar or {}
   local showLast10 = calIsLastTenNights(hijri)
@@ -320,7 +310,6 @@ function M.buildCalendarTab(calendar, hijri, gregorian, hadith)
     M.buildCalGrid(calendar),
     M.buildCalTodayEvent(calendar, hijri, showLast10),
     M.buildCalLast10Banner(calendar, hijri, showLast10),
-    M.buildCalSyncLabel(calendar),
   })
 end
 
