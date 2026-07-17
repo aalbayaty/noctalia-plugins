@@ -1,0 +1,26 @@
+id = "aalbayaty/remmina-launcher"
+name = "Remmina Launcher"
+version = "1.0.0"
+plugin_api = 3
+min_noctalia = "5.0.0"
+author = "aalbayaty"
+license = "MIT"
+dependencies = []
+tags = ["Launcher", "Network"]
+icon = "device-desktop"
+description = "Browse and launch Remmina remote-desktop connections from the launcher."
+
+[[launcher_provider]]
+id = "remmina"
+entry = "provider.luau"
+prefix = "remmina"
+glyph = "device-desktop"
+include_in_global_search = true
+debounce_ms = 100
+
+  [[launcher_provider.setting]]
+  key = "remminaDir"
+  type = "string"
+  label_key = "settings.remminaDir.label"
+  description_key = "settings.remminaDir.description"
+  default = "~/.local/share/remmina"
