@@ -1,6 +1,6 @@
 id = "aalbayaty/steam-launcher"
 name = "Steam Launcher"
-version = "1.0.0"
+version = "1.0.1"
 plugin_api = 3
 min_noctalia = "5.0.0"
 author = "aalbayaty"
@@ -18,16 +18,19 @@ glyph = "device-gamepad-2"
 include_in_global_search = true
 debounce_ms = 100
 
-  [[launcher_provider.setting]]
-  key = "steamappsDir"
-  type = "string"
-  label_key = "settings.steamappsDir.label"
-  description_key = "settings.steamappsDir.description"
-  default = "~/.steam/steam/steamapps"
+# Plugin-level settings (the shell rejects entry-level [[launcher_provider.setting]]
+# even though validate-plugins.py accepts it — launcher_provider settings must be
+# top-level [[setting]], as in the official translator/kaomoji plugins).
+[[setting]]
+key = "steamappsDir"
+type = "string"
+label_key = "settings.steamappsDir.label"
+description_key = "settings.steamappsDir.description"
+default = "~/.steam/steam/steamapps"
 
-  [[launcher_provider.setting]]
-  key = "librarycacheDir"
-  type = "string"
-  label_key = "settings.librarycacheDir.label"
-  description_key = "settings.librarycacheDir.description"
-  default = "~/.steam/steam/appcache/librarycache"
+[[setting]]
+key = "librarycacheDir"
+type = "string"
+label_key = "settings.librarycacheDir.label"
+description_key = "settings.librarycacheDir.description"
+default = "~/.steam/steam/appcache/librarycache"

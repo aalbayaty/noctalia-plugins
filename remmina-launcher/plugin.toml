@@ -1,6 +1,6 @@
 id = "aalbayaty/remmina-launcher"
 name = "Remmina Launcher"
-version = "1.0.0"
+version = "1.0.1"
 plugin_api = 3
 min_noctalia = "5.0.0"
 author = "aalbayaty"
@@ -18,9 +18,12 @@ glyph = "device-desktop"
 include_in_global_search = true
 debounce_ms = 100
 
-  [[launcher_provider.setting]]
-  key = "remminaDir"
-  type = "string"
-  label_key = "settings.remminaDir.label"
-  description_key = "settings.remminaDir.description"
-  default = "~/.local/share/remmina"
+# Plugin-level settings (the shell rejects entry-level [[launcher_provider.setting]]
+# even though validate-plugins.py accepts it — launcher_provider settings must be
+# top-level [[setting]], as in the official translator/kaomoji plugins).
+[[setting]]
+key = "remminaDir"
+type = "string"
+label_key = "settings.remminaDir.label"
+description_key = "settings.remminaDir.description"
+default = "~/.local/share/remmina"
