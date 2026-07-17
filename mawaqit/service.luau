@@ -53,8 +53,24 @@ local function commonQuery(cfg)
     cfg.school or "0", M.buildTuneParam(cfg))
 end
 
-function M.buildWeeklyUrl(cfg, ddmmyyyy)
-  return string.format("%s/timingsByCity/%s?%s&days=7", API_BASE, ddmmyyyy, commonQuery(cfg))
+local function isoToDDMMYYYY(iso)
+  local y, m, d = tostring(iso):match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+  if not y then return iso end
+  return string.format("%s-%s-%s", d, m, y)
+end
+
+local function addDaysToISO(iso, days)
+  local y, m, d = tostring(iso):match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+  if not y then return iso end
+  local jdn = M.toJDN(tonumber(y), tonumber(m), tonumber(d))
+  local yy, mm, dd = M.jdnToGreg(jdn + days)
+  return string.format("%04d-%02d-%02d", yy, mm, dd)
+end
+
+function M.buildWeeklyUrl(cfg, todayISO)
+  local start = isoToDDMMYYYY(todayISO)
+  local finish = isoToDDMMYYYY(addDaysToISO(todayISO, 6))
+  return string.format("%s/calendarByCity/from/%s/to/%s?%s", API_BASE, start, finish, commonQuery(cfg))
 end
 function M.buildSingleDayUrl(cfg)
   return string.format("%s/timingsByCity?%s", API_BASE, commonQuery(cfg))
@@ -699,11 +715,6 @@ end
 
 -- ── Task 3.3: Fetch pipeline + state publishing ──────────────────────────────
 
-local function isoToDDMMYYYY(iso)
-  local y, m, d = tostring(iso):match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
-  if not y then return iso end
-  return string.format("%s-%s-%s", d, m, y)
-end
 
 M._PRAYER_NAMES_AR = { Fajr = "الفجر", Dhuhr = "الظهر", Asr = "العصر", Maghrib = "المغرب", Isha = "العشاء", Imsak = "الإمساك" }
 
@@ -919,8 +930,7 @@ function M._fetch(cfg, nowCtx)
   M._lastAttemptDate = nowCtx.todayISO
   M._cfg = cfg
   noctalia.state.set("status", "loading")
-  local ddmmyyyy = isoToDDMMYYYY(nowCtx.todayISO)
-  local weeklyUrl = M.buildWeeklyUrl(cfg, ddmmyyyy)
+  local weeklyUrl = M.buildWeeklyUrl(cfg, nowCtx.todayISO)
   noctalia.http({ url = weeklyUrl }, function(resp)
     local entry = nil
     if resp and resp.ok and resp.status == 200 then
