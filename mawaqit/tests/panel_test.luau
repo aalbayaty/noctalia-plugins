@@ -204,8 +204,8 @@ end)
 
 H.test("buildCalendarTab date row is clickable and goes back to today", function()
   local tree = M.buildCalendarTab(makeCalendar(), { day = 5, month = 1, year = 1448, days = 30 }, "16 Jul 2026", nil)
-  local dateRow = H.find(tree, function(n) return n.type == "row" and n.props.onClick == "onCalToday" end)
-  H.truthy(dateRow, "date row in calendar tab is clickable for onCalToday")
+  local todayBtn = H.find(tree, function(n) return n.type == "button" and n.props.onClick == "onCalToday" end)
+  H.truthy(todayBtn, "date row in calendar tab is clickable for onCalToday")
 end)
 
 H.test("buildCalendarTab renders the hadith block", function()

@@ -22,9 +22,15 @@ function M.buildHeader()
   })
 end
 
-function M.buildDateRow(hijri, gregorian)
+function M.buildDateRow(hijri, gregorian, onClick)
   hijri = hijri or {}
   local hijriText = (hijri.displayAr ~= nil and hijri.displayAr ~= "") and hijri.displayAr or (hijri.display or "")
+  if onClick then
+    return ui.row({ justify = "space_between", align = "center" }, {
+      ui.button({ text = gregorian or "", variant = "ghost", color = "secondary", onClick = onClick }),
+      ui.button({ text = hijriText, variant = "ghost", color = "secondary", fontFamily = M.FONT, onClick = onClick }),
+    })
+  end
   return ui.row({ justify = "space_between", align = "center" }, {
     ui.label({ text = gregorian or "", color = "secondary" }),
     ui.label({ text = hijriText, fontFamily = M.FONT, color = "secondary" }),
@@ -206,7 +212,14 @@ local function calDayCell(cell)
 end
 
 -- The 7-col day grid: `calendar.leadingBlanks` leading ui.spacer cells, then
--- one cell per calendar.cells entry, then trailing ui.spacer padding out to a
+-- A blank placeholder that occupies the same 40×40 footprint as a day cell so
+-- the 7-column grid stays aligned and ragged rows don't collapse or spread.
+local function calBlankCell()
+  return ui.box({ width = 40, height = 40, fill = "transparent" })
+end
+
+-- The 7-col day grid: `calendar.leadingBlanks` leading placeholder cells, then
+-- calendar.cells day columns, then trailing placeholder padding out to a
 -- full multiple of 7 — mirrors v4's `Math.ceil(filledCount/7)*7` padding
 -- (Panel.qml:607-612) so every row has exactly 7 cells and columns stay
 -- aligned with the weekday header above (a ragged last row would get spread
@@ -214,14 +227,14 @@ end
 function M.buildCalGrid(calendar)
   local flat = {}
   for _ = 1, (calendar.leadingBlanks or 0) do
-    table.insert(flat, ui.spacer())
+    table.insert(flat, calBlankCell())
   end
   for _, cell in ipairs(calendar.cells or {}) do
     table.insert(flat, calDayCell(cell))
   end
   local needed = math.ceil(#flat / 7) * 7
   for _ = #flat + 1, needed do
-    table.insert(flat, ui.spacer())
+    table.insert(flat, calBlankCell())
   end
 
   local rows, row = {}, {}
@@ -278,8 +291,7 @@ end
 function M.buildCalendarTab(calendar, hijri, gregorian, hadith)
   calendar = calendar or {}
   local showLast10 = calIsLastTenNights(hijri)
-  local dateRow = M.buildDateRow(hijri, gregorian)
-  dateRow.props.onClick = "onCalToday"
+  local dateRow = M.buildDateRow(hijri, gregorian, "onCalToday")
   return ui.column({ gap = 8 }, {
     dateRow,
     M.buildCalNav(calendar),
