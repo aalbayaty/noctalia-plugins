@@ -44,19 +44,24 @@ end
 -- fills in this shell, so each half carries its OWN rounded fill on a ui.column
 -- (which supports fill + radius and renders children). Active = primary fill,
 -- inactive = translucent surface. A transparent `ghost` button inside is the
--- click target + label.
+-- click target + centered label.
+--
+-- Both halves get flexGrow = 1 on the outer column so the row splits 50/50.
+-- The column defaults to stretching its child across its width (no `align`,
+-- which would shrink it to content), and the button also flexGrows + centers
+-- its label so the click/label area fills the whole rounded half.
 local function tabHalf(key, textKey, active, onClick)
   return ui.column({
     flexGrow = 1,
     fill = active and "primary" or "surface_variant/0.4",
     radius = 999,
-    align = "center",
     justify = "center",
   }, {
     ui.button({
       key = key,
       text = noctalia.tr(textKey),
       variant = active and "primary" or "ghost",
+      contentAlign = "center",
       flexGrow = 1,
       onClick = onClick,
     }),
