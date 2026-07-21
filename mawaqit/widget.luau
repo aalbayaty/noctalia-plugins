@@ -30,7 +30,7 @@ function M._start()
   local function render()
     local cd = noctalia.state.get("countdown") or { text = "…", glyph = "building-mosque", mode = "loading", color = "primary" }
     barWidget.render(M.buildTree(cd, readCfg(), barWidget.isVertical()))
-    if cd.label and cd.next then barWidget.setTooltip(cd.label .. ": " .. (cd.text or "")) end
+    if cd.label and cd.next then barWidget.setTooltip(cd.label .. ": " .. (cd.time or "")) end
   end
   noctalia.state.watch("countdown", render)
   noctalia.state.watch("status", render)

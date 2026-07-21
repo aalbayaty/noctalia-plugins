@@ -30,6 +30,13 @@ H.test("start renders + watch re-renders + onClick opens panel", function()
   H.env.onClick()
   H.eq(H.calls.togglePanel, "aalbayaty/mawaqit:panel", "click opens panel")
 end)
+H.test("tooltip shows prayer time not countdown text", function()
+  H.setConfig({ textColor="none", iconColor="none", activeColor="primary" })
+  M._start()
+  H.state.set("countdown", { text = "Fajr 10m 30s", label = "Fajr", next = "Fajr", time = "13:05",
+    glyph = "sun-moon", mode = "countdown", color = "primary" })
+  H.eq(H.calls.tooltip, "Fajr: 13:05", "tooltip shows prayer time, not countdown text")
+end)
 H.test("loading state renders … glyph", function()
   local t = M.buildTree({ text = "…", glyph = "building-mosque", mode = "loading", color = "primary" },
                         { textColor="none", iconColor="none", activeColor="primary" }, false)

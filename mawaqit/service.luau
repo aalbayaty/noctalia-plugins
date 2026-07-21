@@ -207,12 +207,12 @@ end
 function M.computeCountdown(timings, nowSec, cfg, ctx)
   ctx = ctx or {}
   if not timings then
-    return { next = nil, label = "", secondsToNext = -1, text = "", mode = "nodata", color = "primary", glyph = cfg.widgetIcon, elapsed = false }
+    return { next = nil, label = "", time = "", secondsToNext = -1, text = "", mode = "nodata", color = "primary", glyph = cfg.widgetIcon, elapsed = false }
   end
 
   local prayers, nextEntry, prevEntry = findNextAndPrev(timings, nowSec, ctx.isRamadan)
   if not prayers then
-    return { next = nil, label = "", secondsToNext = -1, text = "", mode = "nodata", color = "primary", glyph = cfg.widgetIcon, elapsed = false }
+    return { next = nil, label = "", time = "", secondsToNext = -1, text = "", mode = "nodata", color = "primary", glyph = cfg.widgetIcon, elapsed = false }
   end
 
   local nextKey = nextEntry.name
@@ -264,6 +264,7 @@ function M.computeCountdown(timings, nowSec, cfg, ctx)
   end
 
   local label = M.labelFor(displayKey, ctx.isJumuah)
+  local timeStr = M.formatTime(timings[displayKey] or "", cfg.use12hourFormat)
   local text
   if mode == "elapsed" then
     local elapsedText = M.formatCountdownText(elapsedSeconds)
@@ -274,7 +275,6 @@ function M.computeCountdown(timings, nowSec, cfg, ctx)
     local cdText = M.formatCountdownText(secondsToNext)
     text = cfg.hidePrayerName and cdText or (label .. " " .. cdText)
   else -- "time"
-    local timeStr = M.formatTime(timings[nextKey] or "", cfg.use12hourFormat)
     text = cfg.hidePrayerName and timeStr or (label .. " " .. timeStr)
   end
 
@@ -288,6 +288,7 @@ function M.computeCountdown(timings, nowSec, cfg, ctx)
   return {
     next = nextKey,
     label = label,
+    time = timeStr,
     secondsToNext = secondsToNext,
     text = text,
     mode = mode,
