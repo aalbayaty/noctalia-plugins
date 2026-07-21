@@ -73,6 +73,7 @@ daily rotating hadith/dhikr.
 | `iconColor` | select | `none` | Bar icon color role. |
 | `activeColor` | select | `primary` | Bar color used while the state is Now/Elapsed. |
 | `showNotifications` | bool | `true` | Send a desktop notification at each prayer time. |
+| `notifyMinutesBefore` | int | `15` | Send a reminder this many minutes before each prayer (0 = off). Shown only when `showNotifications` is on. |
 
 ## Data source
 

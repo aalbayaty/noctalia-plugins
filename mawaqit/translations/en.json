@@ -48,6 +48,7 @@
     "activeColor": { "label": "Active color", "description": "Bar color during Now/Elapsed." },
     "color": { "none": "Default", "primary": "Primary", "secondary": "Secondary", "tertiary": "Tertiary", "error": "Error" },
     "showNotifications": { "label": "Prayer notifications" },
-    "notifications": { "description": "Send a desktop notification at each prayer time." }
+    "notifications": { "description": "Send a desktop notification at each prayer time." },
+    "notifyMinutesBefore": { "label": "Pre-prayer reminder (min)", "description": "Send a notification this many minutes before each prayer. Set to 0 to disable." }
   }
 }

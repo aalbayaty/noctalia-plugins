@@ -1,6 +1,6 @@
 id = "aalbayaty/mawaqit"
 name = "Mawaqit"
-version = "2.0.27"
+version = "2.1.0"
 plugin_api = 3
 min_noctalia = "5.0.0"
 author = "aalbayaty"
@@ -263,3 +263,14 @@ type = "bool"
 label_key = "settings.showNotifications.label"
 description_key = "settings.notifications.description"
 default = true
+
+[[setting]]
+key = "notifyMinutesBefore"
+type = "int"
+label_key = "settings.notifyMinutesBefore.label"
+description_key = "settings.notifyMinutesBefore.description"
+default = 15
+min = 0
+max = 30
+step = 1
+visible_when = { key = "showNotifications", values = ["true"] }

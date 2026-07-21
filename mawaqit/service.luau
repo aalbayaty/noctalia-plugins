@@ -27,6 +27,16 @@ function M.formatCountdownText(seconds)
   return string.format("%ds", s)
 end
 
+-- Shift a "HH:MM" string by deltaMinutes (may be negative). Wraps modulo 24h, so a
+-- 00:10 prayer shifted by -15 → 23:55. Pure: same input always yields same output.
+-- Used to compute the wall-clock minute at which a pre-prayer reminder should fire.
+function M._shiftHHMM(hhmm, deltaMinutes)
+  local h, m = hhmm:match("^(%d+):(%d+)")
+  if not h then return nil end
+  local totalMin = (tonumber(h) * 60 + tonumber(m) + deltaMinutes) % 1440
+  return string.format("%02d:%02d", math.floor(totalMin / 60), totalMin % 60)
+end
+
 local API_BASE = "https://api.aladhan.com/v1"
 
 function M.cleanTime(raw)
@@ -115,6 +125,9 @@ end
 M.PRAYER_ORDER = { "Imsak", "Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha" }
 M.PRAYER_KEYS = { "Fajr", "Dhuhr", "Asr", "Maghrib", "Isha" }
 M.NOTIFY_KEYS = { "Imsak", "Fajr", "Dhuhr", "Asr", "Maghrib", "Isha" }
+-- Pre-prayer reminder keys exclude Imsak (Imsak is itself a pre-Fajr marker, so a
+-- "15 min before Imsak" notify is not meaningful). At-prayer notify still covers Imsak.
+M.PRE_NOTIFY_KEYS = { "Fajr", "Dhuhr", "Asr", "Maghrib", "Isha" }
 M.PRAYER_GLYPHS = { Imsak = "moon", Fajr = "sun-moon", Sunrise = "sunrise", Dhuhr = "sun-high",
   Asr = "sun-low", Maghrib = "sunset", Isha = "moon-stars" }
 
@@ -686,6 +699,7 @@ function M._readConfig()
     widgetIcon = cfgStr("widgetIcon", "building-mosque"), dynamicIcon = cfgBool("dynamicIcon", false),
     textColor = cfgStr("textColor", "none"), iconColor = cfgStr("iconColor", "none"), activeColor = cfgStr("activeColor", "primary"),
     showNotifications = cfgBool("showNotifications", true),
+    notifyMinutesBefore = cfgInt("notifyMinutesBefore", 15),
   }
 end
 
@@ -970,20 +984,40 @@ end
 
 -- ── Task 3.4: Tick, notifications, command channel, lifecycle ───────────────
 
--- Minute-boundary notify dedup (via M._lastNotifiedMinute) + emoji title +
--- Arabic body, ported from Main.qml's checkPrayerTimes/onPrayerTime. No azan.
+-- Minute-boundary notify dedup + emoji title + Arabic body, ported from Main.qml's
+-- checkPrayerTimes/onPrayerTime. No azan. Two independent dedup slots so a pre-prayer
+-- reminder and an at-prayer notify can both fire when their wall-clock minutes differ:
+--   _lastNotifiedMinute     — at-prayer notify (Imsak, Fajr, Dhuhr, Asr, Maghrib, Isha)
+--   _lastPreNotifiedMinute  — pre-prayer reminder (excludes Imsak; lead = cfg.notifyMinutesBefore)
 function M._maybeNotify(entry, cfg, ctx, hhmm)
   if not entry or not entry.timings or not hhmm then return end
-  if hhmm == M._lastNotifiedMinute then return end
-  for _, key in ipairs(M.NOTIFY_KEYS) do
-    if entry.timings[key] == hhmm then
-      M._lastNotifiedMinute = hhmm
-      if cfg.showNotifications then
-        if key == "Imsak" then
-          noctalia.notify("🌙 Imsak — " .. hhmm, "حان وقت الإمساك")
-        else
+  -- At-prayer notify (dedup via _lastNotifiedMinute)
+  if hhmm ~= M._lastNotifiedMinute then
+    for _, key in ipairs(M.NOTIFY_KEYS) do
+      if entry.timings[key] == hhmm then
+        M._lastNotifiedMinute = hhmm
+        if cfg.showNotifications then
+          if key == "Imsak" then
+            noctalia.notify("🌙 Imsak — " .. hhmm, "حان وقت الإمساك")
+          else
+            local arName = M._PRAYER_NAMES_AR[key] or key
+            noctalia.notify("🕌 " .. key .. " — " .. hhmm, "حان الآن موعد صلاة " .. arName)
+          end
+        end
+      end
+    end
+  end
+  -- Pre-prayer reminder (dedup via _lastPreNotifiedMinute); excludes Imsak.
+  local lead = cfg.notifyMinutesBefore or 0
+  if lead > 0 and hhmm ~= M._lastPreNotifiedMinute then
+    for _, key in ipairs(M.PRE_NOTIFY_KEYS) do
+      local prayerHHMM = entry.timings[key]
+      if prayerHHMM and M._shiftHHMM(prayerHHMM, -lead) == hhmm then
+        M._lastPreNotifiedMinute = hhmm
+        if cfg.showNotifications then
           local arName = M._PRAYER_NAMES_AR[key] or key
-          noctalia.notify("🕌 " .. key .. " — " .. hhmm, "حان الآن موعد صلاة " .. arName)
+          noctalia.notify("🕌 " .. key .. " in " .. lead .. " min — " .. prayerHHMM,
+            "صلاة " .. arName .. " بعد " .. M.toArabicNumerals(lead) .. " دقيقة")
         end
       end
     end
@@ -1045,6 +1079,10 @@ function update()
 end
 
 function onConfigChanged()
+  -- A setting change (e.g. notifyMinutesBefore lead) should re-arm notify dedup so the
+  -- new lead time can fire immediately if the current minute now matches.
+  M._lastNotifiedMinute = nil
+  M._lastPreNotifiedMinute = nil
   M._fetch(M._readConfig(), M._nowCtx())
 end
 

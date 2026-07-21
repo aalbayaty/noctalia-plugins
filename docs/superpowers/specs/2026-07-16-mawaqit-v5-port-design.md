@@ -168,6 +168,14 @@ compute prayer/Hijri/calendar data themselves.
   elapsed / "now" grace and, at each minute boundary, compare `HH:MM` against
   `{Imsak,Fajr,Dhuhr,Asr,Maghrib,Isha}` → `noctalia.notify` (dedup via last-notified minute).
   **No azan.** Imsak only participates during Ramadan.
+- **Pre-prayer reminder (added v2.1.0):** a second, independent notify path fires
+  `cfg.notifyMinutesBefore` minutes (int, default 15, range 0–30, 0 = off) before each of the
+  five prayers — **excluding Imsak** (Imsak is itself a pre-Fajr marker). The lead minute is
+  computed from wall-clock arithmetic via the pure helper `_shiftHHMM(prayerHHMM, -lead)`
+  (wraps modulo 24 h, so a 00:10 Fajr with lead 15 fires at 23:55). Dedup uses a separate
+  `_lastPreNotifiedMinute` slot so a pre-reminder and an at-prayer notify can both fire for the
+  same prayer. Both slots are cleared in `onConfigChanged()`. Title: `🕌 Dhuhr in 15 min — 13:05`;
+  body (Arabic, all locales): `صلاة الظهر بعد ١٥ دقيقة` ("Dhuhr prayer is in 15 minutes").
 - **`onConfigChanged()`:** clear affected caches and refetch.
 - **Command channel** (`noctalia.state.watch("command", …)`): the panel/widget publish
   `{action, ts, …}` — `refresh` (refetch prayers), `calendar` (`{month, year}` → build/publish
