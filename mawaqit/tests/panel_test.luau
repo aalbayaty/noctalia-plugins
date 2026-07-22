@@ -68,33 +68,49 @@ H.test("prayer list one row per prayer", function()
     { key="Fajr", label="Fajr", time="02:50", isNext=true, highlight="next" },
     { key="Dhuhr", label="Dhuhr", time="13:05", isNext=false, highlight=nil },
   }
-  local list = M.buildPrayerList(prayers)
+  local list = M.buildPrayerList(prayers, "Fajr")
   local rows = H.findAll(list, function(n) return n.type == "row" end)
   H.eq(#rows, 2, "one row per prayer")
 end)
 H.test("next-prayer row highlight fill", function()
   local prayers = { { key="Fajr", label="Fajr", time="02:50", isNext=true, highlight="next" } }
-  local list = M.buildPrayerList(prayers)
+  local list = M.buildPrayerList(prayers, "Fajr")
   local row = H.find(list, function(n) return n.type == "row" end)
   H.eq(row.props.fill, "primary/0.15", "next row fill")
 end)
 H.test("imsak-in-ramadan row highlight fill", function()
   local prayers = { { key="Imsak", label="Imsak", time="02:40", isNext=false, highlight="imsak" } }
-  local list = M.buildPrayerList(prayers)
+  local list = M.buildPrayerList(prayers, "Fajr")
   local row = H.find(list, function(n) return n.type == "row" end)
   H.eq(row.props.fill, "secondary/0.08", "imsak row fill")
 end)
 H.test("maghrib-in-ramadan row highlight fill", function()
   local prayers = { { key="Maghrib", label="Maghrib", time="21:07", isNext=false, highlight="maghrib" } }
-  local list = M.buildPrayerList(prayers)
+  local list = M.buildPrayerList(prayers, "Fajr")
   local row = H.find(list, function(n) return n.type == "row" end)
   H.eq(row.props.fill, "tertiary/0.08", "maghrib row fill")
 end)
 H.test("plain row uses surface_variant fill", function()
   local prayers = { { key="Asr", label="Asr", time="17:20", isNext=false, highlight=nil } }
-  local list = M.buildPrayerList(prayers)
+  local list = M.buildPrayerList(prayers, "Maghrib")
   local row = H.find(list, function(n) return n.type == "row" end)
   H.eq(row.props.fill, "surface_variant", "plain row fill")
+end)
+H.test("prayer list highlight follows live nextKey, not stale fetch-time highlight", function()
+  -- Reproduces the reported bug: a fetch happened when Fajr was next (frozen
+  -- into prayers as highlight="next"), but time has since moved on and the live
+  -- countdown.next now points at Dhuhr. The panel must highlight Dhuhr, not
+  -- the stale Fajr, without needing a refresh.
+  local prayers = {
+    { key="Fajr", label="Fajr", time="02:50", isNext=false, highlight="next" },  -- stale
+    { key="Dhuhr", label="Dhuhr", time="13:05", isNext=false, highlight=nil },
+    { key="Asr", label="Asr", time="17:20", isNext=false, highlight=nil },
+  }
+  local list = M.buildPrayerList(prayers, "Dhuhr")
+  local rows = H.findAll(list, function(n) return n.type == "row" end)
+  H.eq(rows[1].props.fill, "surface_variant", "stale Fajr row no longer highlighted")
+  H.eq(rows[2].props.fill, "primary/0.15", "live Dhuhr row now highlighted")
+  H.eq(rows[3].props.fill, "surface_variant", "Asr stays plain")
 end)
 H.test("prayer list renders the published Jumuah-aware glyph for Dhuhr on Friday", function()
   local prayers = {
@@ -102,7 +118,7 @@ H.test("prayer list renders the published Jumuah-aware glyph for Dhuhr on Friday
     { key="Dhuhr", label="Jumu'ah", glyph="building-mosque", time="13:05", isNext=false, highlight="none" },
     { key="Asr", label="Asr", time="17:20", isNext=false, highlight="none" },
   }
-  local list = M.buildPrayerList(prayers)
+  local list = M.buildPrayerList(prayers, "Fajr")
   local dhuhrRow = H.find(list, function(n)
     return n.type == "row" and H.find(n, function(c) return c.type == "label" and c.props.text == "Jumu'ah" end) ~= nil
   end)

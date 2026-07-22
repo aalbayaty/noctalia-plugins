@@ -109,10 +109,23 @@ local function rowFill(highlight)
   return "surface_variant"
 end
 
-function M.buildPrayerList(prayers)
+-- Derive a row's highlight from the live `nextKey` (the authoritative "which
+-- prayer is next", from `countdown.next`, republished every second) rather
+-- than the fetch-time `p.highlight`, which is frozen at the last fetch and
+-- drifts out of sync as prayer times pass. The "next" tint is owned by
+-- nextKey; the Ramadan "imsak"/"maghrib" tints are time-independent (depend
+-- only on isRamadan) so they're safe to keep from the fetch-time computation.
+local function rowHighlight(p, nextKey)
+  local base = p.highlight
+  if base == "next" then base = nil end  -- "next" is recomputed from nextKey
+  if p.key == nextKey then return "next" end
+  return base  -- "imsak" | "maghrib" | nil
+end
+
+function M.buildPrayerList(prayers, nextKey)
   local rows = {}
   for _, p in ipairs(prayers or {}) do
-    table.insert(rows, ui.row({ fill = rowFill(p.highlight), gap = 6, align = "center" }, {
+    table.insert(rows, ui.row({ fill = rowFill(rowHighlight(p, nextKey)), gap = 6, align = "center" }, {
       ui.glyph({ name = p.glyph or "building-mosque" }),
       ui.label({ text = p.label, fontSize = 19 }),
       ui.spacer(),
@@ -351,7 +364,7 @@ function M.buildTree(state, activeTab)
   else
     table.insert(children, M.buildStatus(state.status, state.error))
     table.insert(children, M.buildCountdownCard(state.countdown, state.isRamadan))
-    table.insert(children, M.buildPrayerList(state.prayers))
+    table.insert(children, M.buildPrayerList(state.prayers, state.countdown and state.countdown.next))
     table.insert(children, M.buildCalHadith(state.hadith, false))
   end
   return ui.column({ gap = 8 }, children)
