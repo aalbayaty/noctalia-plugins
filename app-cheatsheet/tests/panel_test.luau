@@ -3,7 +3,7 @@
 local H = require("./harness")
 local M = H.loadEntry("../panel")
 
-local STRINGS = { title = "Applications", count = "3 apps", loading = "loading", empty = "empty" }
+local STRINGS = { title = "Applications", count = "3 apps", loading = "loading", empty = "empty", refresh = "refresh" }
 
 local function group(name, n)
   local apps = {}
@@ -68,6 +68,30 @@ H.test("open: renders the snapshot, requests a rescan, click launches via gio an
   H.eq(H.calls.closed, 1, "panel closed")
   H.noctalia.state.set("app-cheatsheet.snapshot", { groups = {}, count = 0 })
   H.eq(H.calls.renderCount, 2, "re-renders on a new snapshot while open")
+end)
+
+H.test("refresh button: requests a full rescan and reflects the busy state", function()
+  H.reset()
+  M._start()
+  H.noctalia.state.set("app-cheatsheet.snapshot", { groups = { group("Games", 1) }, count = 1 })
+  M.onOpen({})
+  local function button() return H.find(H.calls.rendered, function(n) return n.type == "button" end)[1] end
+  H.eq(button().props.glyph, "refresh", "idle glyph")
+  button().props.onClick()
+  H.eq(H.noctalia.state.get("app-cheatsheet.force-refresh"), 1, "force refresh requested")
+  H.noctalia.state.set("app-cheatsheet.busy", true)
+  H.eq(button().props.glyph, "loader", "busy glyph")
+end)
+
+H.test("render: the tree is reused while nothing changed", function()
+  H.reset()
+  M._start()
+  H.noctalia.state.set("app-cheatsheet.snapshot", { groups = { group("Games", 1) }, count = 1 })
+  M.onOpen({})
+  local first = H.calls.rendered
+  H.env.onClose()
+  M.onOpen({})
+  H.ok(H.calls.rendered == first, "same tree on reopen")
 end)
 
 H.test("launch: missing gio reports an error and keeps the panel open", function()

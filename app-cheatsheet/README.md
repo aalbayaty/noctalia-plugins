@@ -28,8 +28,20 @@ Every `.desktop` file under `$XDG_DATA_HOME/applications` and each
 included), minus entries that are `NoDisplay`, `Hidden`, `Terminal=true`, not
 `Type=Application`, or excluded for the current desktop by
 `OnlyShowIn`/`NotShowIn`. When two directories ship the same desktop id, the
-earlier one wins, as the spec requires. The list is rescanned each time the
-panel opens.
+earlier one wins, as the spec requires.
+
+## Cache and refresh
+
+The grouped list, including resolved icon paths, is saved to the plugin data
+directory and shown immediately on the next shell start. Opening the panel
+triggers a light rescan in the background: new, removed or renamed apps are
+picked up, and icons already resolved are reused. The refresh button in the
+panel header (or the IPC call below) does a full rescan that also re-resolves
+every icon; use it after changing the icon theme.
+
+```sh
+noctalia msg plugin aalbayaty/app-cheatsheet:data all refresh
+```
 
 ## Categories
 

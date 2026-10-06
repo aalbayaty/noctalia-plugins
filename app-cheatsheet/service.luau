@@ -1,7 +1,8 @@
 --!nonstrict
 -- Data service for App Cheatsheet. Scans the XDG application directories,
 -- keeps the visible GUI entries, groups them by category and publishes a
--- display-ready snapshot to noctalia.state for the panel.
+-- display-ready snapshot to noctalia.state for the panel. The snapshot is
+-- also saved to the plugin data dir and republished from there on start.
 --
 -- The scan is a `grep` per directory rather than listDir + readFile: one
 -- subprocess returns only the handful of keys we need from every .desktop
@@ -16,8 +17,16 @@ local REFRESH_KEY = "app-cheatsheet.refresh"
 local STEP_KEY = "app-cheatsheet.service-step"
 
 local SCAN_PATTERN = "^(\\[|(Type|Name|Icon|Categories|NoDisplay|Hidden|Terminal|OnlyShowIn|NotShowIn)=)"
-local ICON_SLICE = 30 -- icon lookups per budget window
+local FORCE_KEY = "app-cheatsheet.force-refresh"
+local BUSY_KEY = "app-cheatsheet.busy"
+local CACHE_FILE = "snapshot.json"
+local CACHE_VERSION = 1
+
+-- Icon-theme lookups are the expensive part (a batch of 30 exceeded the
+-- ~25 ms callback budget), so they are sliced by time, not by count.
+local ICON_SLICE_SECONDS = 0.004
 local ICON_SIZE = 48
+local SCAN_STALE_SECONDS = 10
 
 M.OTHER = "Other"
 
@@ -246,6 +255,20 @@ function M.signature(groups)
   return table.concat(parts, "\n")
 end
 
+-- Shape check for a snapshot read back from disk.
+function M.validSnapshot(data)
+  if type(data) ~= "table" or data.version ~= CACHE_VERSION or type(data.groups) ~= "table" then return false end
+  for _, group in ipairs(data.groups) do
+    if type(group.name) ~= "string" or type(group.apps) ~= "table" then return false end
+    for _, app in ipairs(group.apps) do
+      if type(app.id) ~= "string" or type(app.name) ~= "string" or type(app.path) ~= "string" or type(app.icon) ~= "string" then
+        return false
+      end
+    end
+  end
+  return type(data.count) == "number"
+end
+
 -- ── Runtime ────────────────────────────────────────────────────────────────
 
 -- Work that does not fit one callback's CPU budget is queued as a step: the
@@ -260,16 +283,37 @@ local function schedule(fn)
   noctalia.state.set(STEP_KEY, stepCounter)
 end
 
+-- A callback that exceeds its budget is killed mid-flight, so nothing here may
+-- rely on a later line of the same callback running. `job` identifies the
+-- current scan: a scan that died leaves `scanning` set, and the next request
+-- after SCAN_STALE_SECONDS abandons it by starting a new job (steps of the
+-- old one see a different id and stop).
+local job = 0
 local scanning = false
+local scanStarted = 0
 local rescanQueued = false
 local lastSignature = nil
-local iconCache = {}
 local scan
+
+-- iconCache[id .. "\0" .. icon] = path | false. Seeded from the disk cache so
+-- a normal rescan does no theme lookups at all; `unverified` marks seeded
+-- paths that still need one existence check (icon paths are often
+-- /nix/store paths that a rebuild + GC removes).
+local iconCache = {}
+local unverified = {}
+
+local function iconKey(app)
+  return app.id .. "\0" .. app.icon
+end
 
 local function iconFor(app)
   if app.icon:sub(1, 1) == "/" then return app.icon end
-  local cacheKey = app.id .. "\0" .. app.icon
+  local cacheKey = iconKey(app)
   local cached = iconCache[cacheKey]
+  if cached and unverified[cacheKey] then
+    unverified[cacheKey] = nil
+    if not noctalia.fileExists(cached) then cached = nil end
+  end
   if cached == nil then
     cached = noctalia.appIconPath(app.id, ICON_SIZE)
     if cached == nil and app.icon ~= "" then cached = noctalia.appIconPath(app.icon, ICON_SIZE) end
@@ -278,54 +322,104 @@ local function iconFor(app)
   return cached or nil
 end
 
+local function cachePath()
+  local directory = noctalia.pluginDataDir()
+  if directory == nil then return nil end
+  return directory .. "/" .. CACHE_FILE
+end
+
+local function setBusy(busy)
+  noctalia.state.set(BUSY_KEY, busy)
+end
+
+-- Publish the last saved snapshot straight away so the panel has content
+-- before (and regardless of) the first scan finishing.
+local function loadCache()
+  local path = cachePath()
+  if path == nil then return end
+  local contents = noctalia.readFile(path)
+  if contents == nil then return end
+  local data = noctalia.json.decode(contents)
+  if not M.validSnapshot(data) then return end
+  for _, group in ipairs(data.groups) do
+    for _, app in ipairs(group.apps) do
+      if app.iconPath ~= nil and app.icon:sub(1, 1) ~= "/" then
+        iconCache[iconKey(app)] = app.iconPath
+        unverified[iconKey(app)] = true
+      end
+    end
+  end
+  lastSignature = M.signature(data.groups)
+  noctalia.state.set(SNAPSHOT_KEY, { groups = data.groups, count = data.count })
+end
+
 local function finish(groups)
   local count = 0
   for _, group in ipairs(groups) do count += #group.apps end
   local signature = M.signature(groups)
+  scanning = false
   if signature ~= lastSignature then
     lastSignature = signature
     noctalia.state.set(SNAPSHOT_KEY, { groups = groups, count = count })
+    local path = cachePath()
+    local encoded = noctalia.json.encode({ version = CACHE_VERSION, groups = groups, count = count })
+    if path ~= nil and encoded ~= nil then noctalia.writeFile(path, encoded) end
   end
-  scanning = false
+  setBusy(false)
   if rescanQueued then
     rescanQueued = false
     scan()
   end
 end
 
-local function resolveIcons(groups)
+local function resolveIcons(groups, myJob)
   local flat = {}
   for _, group in ipairs(groups) do
     for _, app in ipairs(group.apps) do table.insert(flat, app) end
   end
   local index = 1
   local function step()
-    local limit = math.min(#flat, index + ICON_SLICE - 1)
-    while index <= limit do
-      flat[index].iconPath = iconFor(flat[index])
-      index += 1
+    if myJob ~= job then return end
+    if index > #flat then
+      finish(groups)
+      return
     end
-    if index <= #flat then schedule(step) else finish(groups) end
+    -- Queue the continuation first and advance before each lookup: a theme
+    -- lookup can be slow enough to get this callback killed, and then the
+    -- next step simply carries on with the following app.
+    schedule(step)
+    local deadline = os.clock() + ICON_SLICE_SECONDS
+    repeat
+      local app = flat[index]
+      index += 1
+      app.iconPath = iconFor(app)
+    until index > #flat or os.clock() >= deadline
   end
   step()
 end
 
-local function group(entries)
+local function group(entries, myJob)
+  if myJob ~= job then return end
   local groups = M.buildGroups(
     entries,
     noctalia.getenv("XDG_CURRENT_DESKTOP"),
     M.parseOverrides(noctalia.getConfig("overrides")),
     M.parseHidden(noctalia.getConfig("hidden"))
   )
-  schedule(function() resolveIcons(groups) end)
+  schedule(function() resolveIcons(groups, myJob) end)
 end
 
 scan = function()
-  if scanning then
+  if scanning and os.time() - scanStarted < SCAN_STALE_SECONDS then
     rescanQueued = true
     return
   end
+  job += 1
+  local myJob = job
   scanning = true
+  scanStarted = os.time()
+  rescanQueued = false
+  setBusy(true)
 
   local dirs = {}
   for _, dir in ipairs(M.appDirs(noctalia.getenv("HOME"), noctalia.getenv("XDG_DATA_HOME"), noctalia.getenv("XDG_DATA_DIRS"))) do
@@ -336,14 +430,16 @@ scan = function()
   local entries = {}
   local index = 0
   local function nextDir()
+    if myJob ~= job then return end
     index += 1
     local dir = dirs[index]
     if dir == nil then
-      schedule(function() group(entries) end)
+      schedule(function() group(entries, myJob) end)
       return
     end
     -- -R follows symlinks (Nix profile and Flatpak export dirs are all links).
     local started = noctalia.runAsync({ "grep", "-R", "-s", "-H", "-E", SCAN_PATTERN, "--include=*.desktop", dir }, function(result)
+      if myJob ~= job then return end
       if result.stdoutTruncated then
         noctalia.log("app-cheatsheet: scan output truncated for " .. dir)
         noctalia.notifyError(noctalia.tr("scan_truncated"), noctalia.tr("scan_truncated_body", { dir = dir }))
@@ -359,12 +455,27 @@ scan = function()
   nextDir()
 end
 
+-- Full refresh: forget every resolved icon and republish even if unchanged.
+local function forceRefresh()
+  iconCache = {}
+  unverified = {}
+  lastSignature = nil
+  scanStarted = 0 -- abandon a scan in flight; it would reuse nothing anyway
+  scan()
+end
+
 function onConfigChanged()
   scan()
 end
 
 function onIpc(event, _payload)
-  if event == "refresh" then scan() end
+  if event == "refresh" then forceRefresh() end
+end
+
+-- Test hook: drop all in-memory state, as a shell restart would.
+function M._reset()
+  steps, iconCache, unverified = {}, {}, {}
+  scanning, rescanQueued, lastSignature, scanStarted = false, false, nil, 0
 end
 
 function M._start()
@@ -373,6 +484,8 @@ function M._start()
     if fn ~= nil then fn() end
   end)
   noctalia.state.watch(REFRESH_KEY, function(_value) scan() end)
+  noctalia.state.watch(FORCE_KEY, function(_value) forceRefresh() end)
+  loadCache()
   scan()
 end
 

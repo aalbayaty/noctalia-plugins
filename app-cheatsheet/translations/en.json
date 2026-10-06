@@ -3,6 +3,7 @@
   "count": "{count} apps",
   "loading": "Scanning applications…",
   "empty": "No applications found.",
+  "refresh": "Rescan applications and icons",
   "widget_tooltip": "App cheatsheet",
   "launch_failed": "Cannot launch application",
   "gio_missing": "The gio command was not found on PATH.",

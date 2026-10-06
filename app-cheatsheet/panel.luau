@@ -7,9 +7,12 @@ local M = {}
 
 local SNAPSHOT_KEY = "app-cheatsheet.snapshot"
 local REFRESH_KEY = "app-cheatsheet.refresh"
+local FORCE_KEY = "app-cheatsheet.force-refresh"
+local BUSY_KEY = "app-cheatsheet.busy"
 local FALLBACK_GLYPH = "app-window"
 
 local snapshot = nil
+local busy = false
 local panelOpen = false
 
 -- Columns the output can fit at ~260px each, capped by the setting.
@@ -73,9 +76,23 @@ local function message(glyph, text)
 end
 
 -- `data` is the service snapshot ({ groups, count }) or nil while loading.
--- `strings` = { title, count, loading, empty }.
-function M.buildTree(data, columnCount, strings, onLaunch)
+-- `strings` = { title, count, loading, empty, refresh }.
+-- `refresh` = { busy, onClick } for the header button, or nil to omit it.
+function M.buildTree(data, columnCount, strings, onLaunch, refresh)
   local header = { ui.label({ text = strings.title, fontSize = 16, fontWeight = "bold", flexGrow = 1 }) }
+  local refreshButton = nil
+  if refresh ~= nil then
+    refreshButton = ui.button({
+      glyph = refresh.busy and "loader" or "refresh",
+      width = 26,
+      height = 26,
+      glyphSize = 14,
+      variant = "ghost",
+      controlSize = "sm",
+      tooltip = strings.refresh,
+      onClick = refresh.onClick,
+    })
+  end
   local body
   if data == nil then
     body = message("loader", strings.loading)
@@ -93,6 +110,7 @@ function M.buildTree(data, columnCount, strings, onLaunch)
       ui.row({ key = "app-columns", gap = 22, align = "stretch" }, columnNodes),
     })
   end
+  if refreshButton ~= nil then table.insert(header, refreshButton) end
   return ui.column({ key = "app-cheatsheet", flexGrow = 1, gap = 8, align = "stretch" }, {
     ui.row({ gap = 8, align = "center" }, header),
     body,
@@ -121,22 +139,37 @@ local function launch(app)
   panel.close()
 end
 
+local function requestRefresh()
+  noctalia.state.set(FORCE_KEY, (tonumber(noctalia.state.get(FORCE_KEY)) or 0) + 1)
+end
+
+-- Building ~100 rows is the panel's only real cost, so the tree is reused
+-- until something it depends on changes.
+local cachedTree, cachedFor = nil, nil
+
 local function render()
-  local strings = {
-    title = noctalia.tr("title"),
-    count = noctalia.tr("count", { count = snapshot ~= nil and snapshot.count or 0 }),
-    loading = noctalia.tr("loading"),
-    empty = noctalia.tr("empty"),
-  }
-  panel.render(M.buildTree(snapshot, M.columnCount(noctalia.getConfig("columns"), outputWidth()), strings, launch))
+  local columns = M.columnCount(noctalia.getConfig("columns"), outputWidth())
+  if cachedTree == nil or cachedFor.snapshot ~= snapshot or cachedFor.columns ~= columns or cachedFor.busy ~= busy then
+    local strings = {
+      title = noctalia.tr("title"),
+      count = noctalia.tr("count", { count = snapshot ~= nil and snapshot.count or 0 }),
+      loading = noctalia.tr("loading"),
+      empty = noctalia.tr("empty"),
+      refresh = noctalia.tr("refresh"),
+    }
+    cachedTree = M.buildTree(snapshot, columns, strings, launch, { busy = busy, onClick = requestRefresh })
+    cachedFor = { snapshot = snapshot, columns = columns, busy = busy }
+  end
+  panel.render(cachedTree)
 end
 
 function onOpen(_context)
   panelOpen = true
   snapshot = noctalia.state.get(SNAPSHOT_KEY)
+  busy = noctalia.state.get(BUSY_KEY) == true
   render()
-  -- Ask the service to rescan so newly installed apps appear; it only
-  -- republishes when something changed.
+  -- Ask the service for a light rescan so newly installed apps appear; known
+  -- icons are reused and it only republishes when something changed.
   noctalia.state.set(REFRESH_KEY, (tonumber(noctalia.state.get(REFRESH_KEY)) or 0) + 1)
 end
 
@@ -157,6 +190,10 @@ end
 function M._start()
   noctalia.state.watch(SNAPSHOT_KEY, function(value)
     snapshot = value
+    if panelOpen then render() end
+  end)
+  noctalia.state.watch(BUSY_KEY, function(value)
+    busy = value == true
     if panelOpen then render() end
   end)
 end
