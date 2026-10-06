@@ -1,6 +1,6 @@
 id = "aalbayaty/app-cheatsheet"
 name = "App Cheatsheet"
-version = "1.1.0"
+version = "1.1.1"
 # 24 is the floor: the service and panel use the argument-array form of
 # runAsync (direct exec, no shell) for the desktop-file scan and the launch.
 plugin_api = 24

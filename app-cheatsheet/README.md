@@ -63,6 +63,10 @@ Browsers rather than Remote & Network:
 | Utilities | Utility |
 | Other | everything else |
 
+Columns are balanced by size: the largest groups are placed first, each into
+the shortest column, so the panel stays roughly even instead of following a
+fixed left-to-right group order.
+
 ## Settings
 
 - **Columns**: maximum number of columns; narrow outputs use fewer.

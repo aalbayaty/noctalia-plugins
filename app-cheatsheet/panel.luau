@@ -22,18 +22,35 @@ function M.columnCount(configured, outputWidth)
   return math.min(wanted, fits)
 end
 
--- Greedy balance: each group goes to the currently shortest column, so the
--- groups keep their order reading down each column. A header counts as two rows.
+-- Balance by size: the largest groups are placed first, each into the
+-- currently shortest column, which keeps column heights close even when one
+-- group dwarfs the rest. Within a column the groups keep their service order
+-- (custom groups first). A header counts as two rows.
 function M.balancedColumns(groups, count)
   local columns = {}
   for index = 1, count do columns[index] = { groups = {}, weight = 0 } end
-  for _, group in ipairs(groups) do
+
+  local bySize = {}
+  for order, group in ipairs(groups) do
+    bySize[order] = { group = group, order = order, weight = #group.apps + 2 }
+  end
+  table.sort(bySize, function(a, b)
+    if a.weight ~= b.weight then return a.weight > b.weight end
+    return a.order < b.order
+  end)
+
+  for _, item in ipairs(bySize) do
     local target = 1
     for index = 2, count do
       if columns[index].weight < columns[target].weight then target = index end
     end
-    table.insert(columns[target].groups, group)
-    columns[target].weight += #group.apps + 2
+    table.insert(columns[target].groups, item)
+    columns[target].weight += item.weight
+  end
+
+  for _, column in ipairs(columns) do
+    table.sort(column.groups, function(a, b) return a.order < b.order end)
+    for index, item in ipairs(column.groups) do column.groups[index] = item.group end
   end
   return columns
 end

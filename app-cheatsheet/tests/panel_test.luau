@@ -26,12 +26,39 @@ H.test("columnCount: capped by the setting and by the output width", function()
   H.eq(M.columnCount(3, 200), 1, "never zero")
 end)
 
-H.test("balancedColumns: fills the shortest column, keeps order within a column", function()
-  local columns = M.balancedColumns({ group("A", 10), group("B", 2), group("C", 2), group("D", 1) }, 2)
-  H.eq(#columns, 2, "count")
-  H.eq(columns[1].groups[1].name, "A", "big group alone")
-  H.eq(#columns[1].groups, 1, "column 1")
-  H.eq(columns[2].groups[1].name .. columns[2].groups[2].name .. columns[2].groups[3].name, "BCD", "column 2 in order")
+local function layout(columns)
+  local out = {}
+  for _, column in ipairs(columns) do
+    local names = {}
+    for _, g in ipairs(column.groups) do table.insert(names, g.name) end
+    table.insert(out, table.concat(names, "+") .. "=" .. column.weight)
+  end
+  return table.concat(out, " ")
+end
+
+H.test("balancedColumns: largest groups placed first, service order kept within a column", function()
+  local columns = M.balancedColumns({ group("A", 2), group("B", 3), group("C", 10), group("D", 1), group("E", 9) }, 2)
+  H.eq(layout(columns), "A+C+D=19 B+E=16", "layout")
+end)
+
+H.test("balancedColumns: a late, oversized group no longer stacks onto a full column", function()
+  -- The real 89-app list: fill-in-order gave columns of 32/23/36/18 rows.
+  local sizes = { { "Browsers", 2 }, { "Communication", 5 }, { "Games", 11 }, { "Development", 10 }, { "Office", 12 },
+    { "Graphics", 4 }, { "Media", 4 }, { "Remote", 8 }, { "System", 21 }, { "Utilities", 12 } }
+  local groups = {}
+  for i, item in ipairs(sizes) do groups[i] = group(item[1], item[2]) end
+  local columns = M.balancedColumns(groups, 4)
+  local low, high = math.huge, 0
+  for _, column in ipairs(columns) do
+    low, high = math.min(low, column.weight), math.max(high, column.weight)
+  end
+  H.ok(high - low <= 4, "columns within 4 rows of each other, got " .. layout(columns))
+end)
+
+H.test("balancedColumns: more columns than groups leaves the extras empty", function()
+  local columns = M.balancedColumns({ group("A", 1) }, 3)
+  H.eq(#columns, 3, "count")
+  H.eq(#columns[2].groups + #columns[3].groups, 0, "empty columns")
 end)
 
 H.test("buildTree: loading and empty states", function()
