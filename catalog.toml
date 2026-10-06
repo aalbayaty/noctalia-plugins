@@ -8,7 +8,7 @@
 [[plugin]]
 id = "aalbayaty/mawaqit"
 name = "Mawaqit"
-version = "2.1.1"
+version = "2.1.2"
 plugin_api = 3
 author = "aalbayaty"
 license = "MIT"
@@ -40,3 +40,15 @@ icon = "device-desktop"
 description = "Browse and launch Remmina remote-desktop connections from the launcher."
 min_noctalia = "5.0.0"
 tags = ["Launcher", "Network"]
+
+[[plugin]]
+id = "aalbayaty/app-cheatsheet"
+name = "App Cheatsheet"
+version = "1.0.0"
+plugin_api = 24
+author = "aalbayaty"
+license = "MIT"
+icon = "apps"
+description = "Cheatsheet panel listing installed GUI applications grouped by category; click to launch."
+min_noctalia = "5.0.0"
+tags = ["Bar", "Panel", "Utility", "Launcher"]

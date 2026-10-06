@@ -1,0 +1,60 @@
+id = "aalbayaty/app-cheatsheet"
+name = "App Cheatsheet"
+version = "1.0.0"
+# 24 is the floor: the service and panel use the argument-array form of
+# runAsync (direct exec, no shell) for the desktop-file scan and the launch.
+plugin_api = 24
+min_noctalia = "5.0.0"
+author = "aalbayaty"
+license = "MIT"
+dependencies = ["grep", "gio"]
+tags = ["Bar", "Panel", "Utility", "Launcher"]
+icon = "apps"
+description = "Cheatsheet panel listing installed GUI applications grouped by category; click to launch."
+
+[[service]]
+id = "data"
+entry = "service.luau"
+
+[[widget]]
+id = "apps"
+entry = "widget.luau"
+
+  [[widget.setting]]
+  key = "glyph"
+  type = "glyph"
+  label_key = "settings.glyph.label"
+  description_key = "settings.glyph.description"
+  default = "apps"
+
+[[panel]]
+id = "cheatsheet"
+entry = "panel.luau"
+width = 1200
+height = 760
+placement = "floating"
+position = "center"
+
+[[setting]]
+key = "columns"
+type = "int"
+label_key = "settings.columns.label"
+description_key = "settings.columns.description"
+default = 4
+min = 1
+max = 6
+step = 1
+
+[[setting]]
+key = "overrides"
+type = "string_list"
+label_key = "settings.overrides.label"
+description_key = "settings.overrides.description"
+default = []
+
+[[setting]]
+key = "hidden"
+type = "string_list"
+label_key = "settings.hidden.label"
+description_key = "settings.hidden.description"
+default = []

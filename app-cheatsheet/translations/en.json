@@ -1,0 +1,29 @@
+{
+  "title": "Applications",
+  "count": "{count} apps",
+  "loading": "Scanning applications…",
+  "empty": "No applications found.",
+  "widget_tooltip": "App cheatsheet",
+  "launch_failed": "Cannot launch application",
+  "gio_missing": "The gio command was not found on PATH.",
+  "scan_truncated": "Application list may be incomplete",
+  "scan_truncated_body": "The scan of {dir} produced more output than a plugin can read.",
+  "settings": {
+    "glyph": {
+      "label": "Bar glyph",
+      "description": "Glyph shown on the bar widget."
+    },
+    "columns": {
+      "label": "Columns",
+      "description": "Maximum number of columns in the panel. Narrow screens use fewer."
+    },
+    "overrides": {
+      "label": "Category overrides",
+      "description": "One entry per app as App=Category, e.g. Steam=Games or org.remmina.Remmina=Work. The app is its name or desktop id; any new category name creates its own group."
+    },
+    "hidden": {
+      "label": "Hidden apps",
+      "description": "App names or desktop ids to leave out of the panel."
+    }
+  }
+}

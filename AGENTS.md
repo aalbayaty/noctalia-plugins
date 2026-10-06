@@ -7,6 +7,7 @@ Guidance for AI agents working in this repo. Read before editing.
 Multi-plugin monorepo for Noctalia **v5** desktop-shell plugins (Luau). Each plugin is one
 top-level directory. Current plugins:
 
+- `app-cheatsheet/` — Cheatsheet panel of installed GUI apps grouped by category.
 - `mawaqit/` — Muslim prayer times, countdown, notifications, Hijri calendar.
 - `remmina-launcher/` — Remmina remote-desktop connection launcher.
 - `steam-launcher/` — Installed Steam game launcher.
@@ -99,5 +100,5 @@ Enforced by `validate-plugins.py` (the CI gate):
 - Commit messages use conventional commits with plugin scope: `feat(mawaqit):`,
   `fix(mawaqit):`, `test(mawaqit):`, `i18n(mawaqit):`, `assets(mawaqit):`,
   `feat(remmina-launcher):`, `fix(remmina-launcher):`, `feat(steam-launcher):`,
-  `fix(steam-launcher):`, `chore:`.
+  `fix(steam-launcher):`, `feat(app-cheatsheet):`, `fix(app-cheatsheet):`, `chore:`.
 - Default branch is `main`; no develop/staging branches.
