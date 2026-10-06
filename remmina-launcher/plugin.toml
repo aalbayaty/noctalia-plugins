@@ -1,6 +1,6 @@
 id = "aalbayaty/remmina-launcher"
 name = "Remmina Launcher"
-version = "1.1.0"
+version = "1.1.1"
 # Declares the newest API level (32, first shipped in Noctalia 5.2). The code
 # only needs 24: the argument-array form of runAsync (direct exec, no shell)
 # for both the scan and the launch, which with the `folder` setting type below

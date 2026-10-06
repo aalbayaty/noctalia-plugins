@@ -136,25 +136,47 @@ function M.formatRow(conn)
   }
 end
 
--- Filter + fuzzy-sort connections by query. Returns LauncherResult-shaped rows.
+-- Score one connection against the query words. Every word must match, in any
+-- order: each is fuzzy-matched against the name, falling back to the protocol,
+-- so "work rdp" finds "RDP Work" and "vnc mac" finds a VNC connection named
+-- "RDP MAC". Returns the summed score (higher = better, as the host orders
+-- launcher results), or nil when any word matches neither.
+function M.scoreConnection(words, conn)
+  local total = 0
+  for _, word in ipairs(words) do
+    local score = noctalia.fuzzyScore(word, conn.name)
+    if score == nil and conn.protocol ~= nil and conn.protocol ~= "" then
+      score = noctalia.fuzzyScore(word, conn.protocol)
+    end
+    if score == nil then return nil end
+    total += score
+  end
+  return total
+end
+
+-- Filter + rank connections by query. Returns LauncherResult-shaped rows.
 -- Empty/whitespace query = browse mode (all, capped at RESULT_LIMIT).
--- Otherwise fuzzy-match on name via noctalia.fuzzyScore, sort asc, cap.
+-- Otherwise match word by word (see M.scoreConnection), best first, capped.
 function M.buildResults(conns, query)
   conns = conns or {}
-  local q = noctalia.string.trim(query or "")
+  local words = {}
+  for word in tostring(query or ""):gmatch("%S+") do table.insert(words, word) end
   local rows = {}
-  if q == "" then
+  if #words == 0 then
     for i = 1, math.min(#conns, RESULT_LIMIT) do
       table.insert(rows, M.formatRow(conns[i]))
     end
     return rows
   end
   local scored = {}
-  for _, c in ipairs(conns) do
-    local score = noctalia.fuzzyScore(q, c.name)
-    if score ~= nil then table.insert(scored, { conn = c, score = score }) end
+  for index, c in ipairs(conns) do
+    local score = M.scoreConnection(words, c)
+    if score ~= nil then table.insert(scored, { conn = c, score = score, index = index }) end
   end
-  table.sort(scored, function(a, b) return a.score < b.score end)
+  table.sort(scored, function(a, b)
+    if a.score ~= b.score then return a.score > b.score end
+    return a.index < b.index
+  end)
   for i = 1, math.min(#scored, RESULT_LIMIT) do
     local r = M.formatRow(scored[i].conn)
     r.score = scored[i].score

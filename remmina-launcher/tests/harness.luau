@@ -27,13 +27,15 @@ H.noctalia = {
     return true
   end,
   commandExists = function(name) return H._cmdExists == nil or H._cmdExists[name] == true end,
+  -- Stand-in for the native matcher: case-insensitive substring, higher =
+  -- better (earlier and tighter matches score more), nil when absent.
   fuzzyScore = function(pattern, text)
     if pattern == nil or pattern == "" then return 0 end
     local p = tostring(pattern):lower()
     local t = tostring(text):lower()
     local start = t:find(p, 1, true)
     if not start then return nil end
-    return start + #t - #p
+    return 1000 - (start + #t - #p)
   end,
   string = {
     trim = function(s) return (tostring(s):gsub("^%s+", ""):gsub("%s+$", "")) end,

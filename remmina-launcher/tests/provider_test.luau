@@ -176,6 +176,35 @@ H.test("buildResults fuzzy filter", function()
   H.eq(#rows, 1, "one match")
   H.eq(rows[1].title, "Dev Box", "dev matched")
 end)
+H.test("buildResults matches words in any order", function()
+  local conns = {
+    { name = "RDP Work", protocol = "RDP", file = "/w.remmina" },
+    { name = "RDP MAC", protocol = "VNC", file = "/m.remmina" },
+  }
+  H.eq(M.buildResults(conns, "Work RDP")[1].title, "RDP Work", "reversed words")
+  H.eq(#M.buildResults(conns, "Work RDP"), 1, "only the connection with both words")
+  H.eq(M.buildResults(conns, "mac RDP")[1].title, "RDP MAC", "name words, any order, whatever the protocol")
+  H.eq(#M.buildResults(conns, "rdp"), 2, "single word still matches both")
+end)
+H.test("buildResults matches the protocol as a word", function()
+  local conns = {
+    { name = "RDP Work", protocol = "RDP", file = "/w.remmina" },
+    { name = "RDP MAC", protocol = "VNC", file = "/m.remmina" },
+  }
+  local rows = M.buildResults(conns, "vnc mac")
+  H.eq(#rows, 1, "one match")
+  H.eq(rows[1].title, "RDP MAC", "found by protocol + name")
+  H.eq(#M.buildResults(conns, "ssh mac"), 0, "every word must match")
+end)
+H.test("buildResults orders best score first", function()
+  local conns = {
+    { name = "Old Production Server", protocol = "RDP", file = "/1.remmina" },
+    { name = "Prod", protocol = "RDP", file = "/2.remmina" },
+  }
+  local rows = M.buildResults(conns, "prod")
+  H.eq(rows[1].title, "Prod", "tighter match first")
+  H.ok(rows[1].score > rows[2].score, "scores descend")
+end)
 H.test("buildResults no match → empty", function()
   H.eq(#M.buildResults(CONNS, "zzzzz"), 0, "no matches")
 end)
