@@ -51,31 +51,85 @@ H.test("parseScanOutput empty → {}", function()
 end)
 
 -- ── shellQuote ──────────────────────────────────────────────────────
-H.test("shellQuote simple", function()
-  H.eq(M.shellQuote("/home/x/steamapps"), "'/home/x/steamapps'", "simple path")
+-- Removed with the shell pipeline: argv exec (plugin_api 24) never quotes.
+
+-- ── appidFromManifestPath ───────────────────────────────────────────
+H.test("appidFromManifestPath extracts digits", function()
+  H.eq(M.appidFromManifestPath("/a/b/appmanifest_12345.acf"), "12345", "appid")
+  H.eq(M.appidFromManifestPath("/a/b/appmanifest_1.acf"), "1", "single digit")
 end)
-H.test("shellQuote with single quote", function()
-  H.eq(M.shellQuote("it's a path"), "'it'\\''s a path'", "escaped single quote")
-end)
-H.test("shellQuote empty", function()
-  H.eq(M.shellQuote(""), "''", "empty -> ''")
+H.test("appidFromManifestPath rejects non-appmanifest", function()
+  H.eq(M.appidFromManifestPath("/a/b/appmanifest_foo.acf"), nil, "non-numeric")
+  H.eq(M.appidFromManifestPath("/a/b/appmanifest_1a.acf"), nil, "trailing letter")
+  H.eq(M.appidFromManifestPath("/a/b/other_1.acf"), nil, "wrong prefix")
+  H.eq(M.appidFromManifestPath("/a/b/appmanifest_1.txt"), nil, "wrong extension")
+  H.eq(M.appidFromManifestPath(""), nil, "empty")
+  H.eq(M.appidFromManifestPath(nil), nil, "nil")
 end)
 
--- ── buildScanScript ──────────────────────────────────────────────────
-H.test("buildScanScript contains key fragments", function()
-  local s = M.buildScanScript("/home/x/steamapps", "/home/x/librarycache")
-  H.ok(s:find("appmanifest_%*%.acf", 1), "find appmanifest glob")
-  H.ok(s:find("/home/x/steamapps", 1), "steamapps path present")
-  H.ok(s:find("/home/x/librarycache", 1), "librarycache path present")
-  H.ok(s:find("runtime", 1), "runtime filter")
-  H.ok(s:find("proton", 1), "proton filter")
-  H.ok(s:find("redistributabl", 1), "redistributabl filter")
-  H.ok(s:find("library_%*", 1), "library_* icon exclusion")
-  H.ok(s:find("appid|name|icon", 1) or s:find("%%s|%%s|%%s", 1), "emit format")
+-- ── buildAwkProgram ─────────────────────────────────────────────────
+H.test("buildAwkProgram keeps the filters and emit format", function()
+  local p = M.buildAwkProgram()
+  H.ok(p:find("runtime", 1, true), "runtime filter")
+  H.ok(p:find("proton", 1, true), "proton filter")
+  H.ok(p:find("redistributabl", 1, true), "redistributabl filter")
+  H.ok(p:find("library_%*", 1), "library_* icon exclusion")
+  H.ok(p:find("appmanifest_%[0%-9%]", 1), "appid regex from filename")
+  H.ok(p:find("%%s|%%s|%%s", 1), "emit format")
+  H.ok(p:find("close%(cmd%)", 1), "getline command closed")
 end)
-H.test("buildScanScript shell-quotes paths", function()
-  local s = M.buildScanScript("/home/x's/steamapps", "/cache")
-  H.ok(s:find("x'\\''s", 1), "single quote in path escaped")
+H.test("buildAwkProgram resets per file (FNR==1)", function()
+  local p = M.buildAwkProgram()
+  H.ok(p:find("FNR==1", 1, true), "per-file reset")
+  -- END blocks must run per file, never once at the end of a batched run, so
+  -- FILENAME (not the awk-end-only ENDFILE) is what identifiers the file.
+  H.ok(p:find("FILENAME", 1, true), "FILENAME used for output path")
+  H.ok(not p:find("ENDFILE", 1, true), "no ENDFILE dependency")
+end)
+H.test("buildAwkProgram has no END block at all", function()
+  -- END fires once per *batch* under `find -exec … {} +`, so an END-based emit
+  -- returns only the last file's game. (It also cannot contain `next`, which is
+  -- a parse error there.) The program must be purely per-record, resetting on
+  -- FNR==1, so no END block may appear.
+  local p = M.buildAwkProgram()
+  H.ok(not p:find("END {", 1, true), "no END block")
+  H.ok(not p:find("%f[%w]next%f[%W]", 1), "no next")
+end)
+
+-- ── buildScanArgv ────────────────────────────────────────────────────
+H.test("buildScanArgv is a direct-exec argv, not a shell string", function()
+  local argv = M.buildScanArgv("/home/x/steamapps", "/home/x/librarycache")
+  H.eq(type(argv), "table", "argv is a table")
+  H.eq(argv[1], "find", "find first")
+  H.eq(argv[2], "/home/x/steamapps", "directory is a bare argv element")
+  H.ok(argv[3] == "-maxdepth" and argv[4] == "1", "maxdepth 1")
+  H.eq(argv[5], "-type", "-type flag")
+  H.eq(argv[6], "f", "regular files only")
+  H.eq(argv[7], "-name", "-name flag")
+  H.eq(argv[8], "appmanifest_*.acf", "glob is a bare argv element")
+  H.eq(argv[9], "-exec", "-exec flag")
+  H.eq(argv[10], "awk", "awk runs via exec")
+  H.eq(argv[11], "-v", "awk gets a variable assignment")
+  H.eq(argv[12], "CACHE=/home/x/librarycache", "librarycache passed as -v")
+  H.eq(argv[13], M.buildAwkProgram(), "program is one argv element")
+  H.ok(argv[14] == "{}" and argv[15] == "+", "batch substitution")
+  H.eq(#argv, 15, "no extra elements")
+end)
+H.test("buildScanArgv passes awkward paths verbatim", function()
+  -- The whole point of argv exec: a directory name with a quote, a space, or a
+  -- shell metacharacter is one element `find` receives untouched. The old shell
+  -- form needed shellQuote() for exactly this and could still be misread.
+  local nasty = "/home/x' $(rm -rf ~) | tee /tmp/p ; steamed/steamapps"
+  local argv = M.buildScanArgv(nasty, "/c")
+  H.eq(argv[2], nasty, "path not shell-escaped or split")
+  H.eq(argv[12], "CACHE=/c", "cache still passed")
+  H.eq(#argv, 15, "path stayed one element")
+end)
+H.test("buildScanArgv never emits a shell", function()
+  local argv = M.buildScanArgv("/a", "/b")
+  for _, v in ipairs(argv) do
+    H.ok(v ~= "sh" and v ~= "-c", "no shell in argv")
+  end
 end)
 
 -- ── buildResults ─────────────────────────────────────────────────────
@@ -183,7 +237,11 @@ H.test("onActivate launches steam://rungameid", function()
   H.setCmdExists({ steam = true })
   M.onActivate("steam:12345")
   H.truthy(H.calls.runAsync, "runAsync called")
-  H.eq(H.calls.runAsync[#H.calls.runAsync], "steam steam://rungameid/12345", "launch command")
+  local argv = H.calls.runAsync[#H.calls.runAsync]
+  H.eq(type(argv), "table", "argv form, not a shell string")
+  H.eq(argv[1], "steam", "program")
+  H.eq(argv[2], "steam://rungameid/12345", "uri is one argv element")
+  H.eq(#argv, 2, "no shell wrapper")
 end)
 
 H.test("onActivate ignores non-steam id", function()

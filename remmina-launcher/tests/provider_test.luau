@@ -80,28 +80,81 @@ H.test("parseScanOutput empty → {}", function()
 end)
 
 -- ── shellQuote ──────────────────────────────────────────────────────
-H.test("shellQuote simple", function()
-  H.eq(M.shellQuote("/home/x/.remmina/server.remmina"), "'/home/x/.remmina/server.remmina'", "simple path")
+-- Removed with the shell pipeline: argv exec (plugin_api 24) never quotes.
+
+-- ── buildAwkProgram ─────────────────────────────────────────────────
+H.test("buildAwkProgram contains key fragments", function()
+  local p = M.buildAwkProgram()
+  H.ok(p:find("name=", 1, true), "extracts name=")
+  H.ok(p:find("protocol=", 1, true), "extracts protocol=")
+  H.ok(p:find("%%s|%%s|%%s", 1), "emit format")
+  H.ok(p:find("FILENAME", 1, true), "FILENAME used for output path")
 end)
-H.test("shellQuote with single quote", function()
-  H.eq(M.shellQuote("it's a path"), "'it'\\''s a path'", "escaped single quote")
+H.test("buildAwkProgram resets per file (FNR==1)", function()
+  local p = M.buildAwkProgram()
+  -- 'find -exec … {} +' batches files into one awk process, so END runs once for
+  -- the batch. FNR==1 resets per file; without it a file lacking name= would
+  -- inherit the previous file's name and be emitted twice.
+  H.ok(p:find("FNR==1", 1, true), "per-file reset")
+  H.ok(not p:find("ENDFILE", 1, true), "no ENDFILE dependency")
+  -- END fires once per batch under {}+, so an END-based emit returns only the
+  -- last file's connection.
+  H.ok(not p:find("END {", 1, true), "no END block")
 end)
-H.test("shellQuote empty", function()
-  H.eq(M.shellQuote(""), "''", "empty -> ''")
+H.test("buildAwkProgram never uses next inside END", function()
+  -- `next` is a parse error in an END action: awk rejects the entire program and
+  -- the scan silently returns nothing.
+  local p = M.buildAwkProgram()
+  H.ok(not p:find("%f[%w]next%f[%W]", 1), "no next")
+end)
+H.test("buildAwkProgram does not sub() over $0", function()
+  -- sub() on a field rewrites $0, and awk re-evaluates the *changed* record
+  -- against later rules — a trailing emit rule then fires on the name rule's own
+  -- output, before protocol= is read.
+  local p = M.buildAwkProgram()
+  H.ok(not p:find("sub%([^,]-%%,%s*\"\"%);%s*name%s*=%s*%$0", 1), "name not built via $0 sub")
+  H.ok(p:find('n=%$0;', 1) or p:find("n=$0;", 1, true), "name goes through a temp var")
+end)
+H.test("buildAwkProgram strips CRLF", function()
+  local p = M.buildAwkProgram()
+  H.ok(p:find("gsub%(/\\\\r$/", 1) or p:find("\\r$", 1, true), "CR stripped")
+end)
+H.test("buildAwkProgram skips files with no name", function()
+  local p = M.buildAwkProgram()
+  H.ok(p:find('name != ""', 1, true), "nameless files do not emit")
 end)
 
--- ── buildScanScript ──────────────────────────────────────────────────
-H.test("buildScanScript contains key fragments", function()
-  local s = M.buildScanScript("/home/x/.remmina")
-  H.ok(s:find("%.remmina", 1), "find .remmina glob")
-  H.ok(s:find("/home/x/.remmina", 1), "remminaDir path present")
-  H.ok(s:find("name=", 1), "extracts name=")
-  H.ok(s:find("protocol=", 1), "extracts protocol=")
-  H.ok(s:find("name|protocol|file", 1) or s:find("%%s|%%s|%%s", 1), "emit format")
+-- ── buildScanArgv ────────────────────────────────────────────────────
+H.test("buildScanArgv is a direct-exec argv, not a shell string", function()
+  local argv = M.buildScanArgv("/home/x/.remmina")
+  H.eq(type(argv), "table", "argv is a table")
+  H.eq(argv[1], "find", "find first")
+  H.eq(argv[2], "/home/x/.remmina", "directory is a bare argv element")
+  H.ok(argv[3] == "-maxdepth" and argv[4] == "1", "maxdepth 1")
+  H.eq(argv[5], "-type", "-type flag")
+  H.eq(argv[6], "f", "regular files only")
+  H.eq(argv[7], "-name", "-name flag")
+  H.eq(argv[8], "*.remmina", "glob is a bare argv element")
+  H.eq(argv[9], "-exec", "-exec flag")
+  H.eq(argv[10], "awk", "awk runs via exec")
+  H.eq(argv[11], M.buildAwkProgram(), "program is one argv element")
+  H.ok(argv[12] == "{}" and argv[13] == "+", "batch substitution")
+  H.eq(#argv, 13, "no extra elements")
 end)
-H.test("buildScanScript shell-quotes path", function()
-  local s = M.buildScanScript("/home/x's/.remmina")
-  H.ok(s:find("x'\\''s", 1), "single quote in path escaped")
+H.test("buildScanArgv passes awkward paths verbatim", function()
+  -- The whole point of argv exec: a directory name with a quote, a space, or a
+  -- shell metacharacter is one element `find` receives untouched. The old shell
+  -- form needed shellQuote() for exactly this and could still be misread.
+  local nasty = "/home/x' $(rm -rf ~) | tee /tmp/p ; .remmina-archive"
+  local argv = M.buildScanArgv(nasty)
+  H.eq(argv[2], nasty, "path not shell-escaped or split")
+  H.eq(#argv, 13, "path stayed one element")
+end)
+H.test("buildScanArgv never emits a shell", function()
+  local argv = M.buildScanArgv("/a")
+  for _, v in ipairs(argv) do
+    H.ok(v ~= "sh" and v ~= "-c", "no shell in argv")
+  end
 end)
 
 -- ── buildResults ─────────────────────────────────────────────────────
@@ -194,7 +247,12 @@ H.test("onActivate launches remmina -c", function()
   H.setCmdExists({ remmina = true })
   M.onActivate("remmina:/home/x/.remmina/server.remmina")
   H.truthy(H.calls.runAsync, "runAsync called")
-  H.eq(H.calls.runAsync[#H.calls.runAsync], "remmina -c '/home/x/.remmina/server.remmina'", "launch command")
+  local argv = H.calls.runAsync[#H.calls.runAsync]
+  H.eq(type(argv), "table", "argv form, not a shell string")
+  H.eq(argv[1], "remmina", "program")
+  H.eq(argv[2], "-c", "connect flag")
+  H.eq(argv[3], "/home/x/.remmina/server.remmina", "file is one argv element")
+  H.eq(#argv, 3, "no shell wrapper")
 end)
 
 H.test("onActivate ignores non-remmina id", function()

@@ -9,19 +9,18 @@
 -- fuzzy-filters the results, and publishes them via launcher.setResults.
 -- onActivate extracts the appid and runs `steam steam://rungameid/<appid>`
 -- detached. No service/widget/panel — a launcher runs on demand.
+--
+-- The scan used to be one `sh -c` pipeline that shell-quoted both directory
+-- settings. It is now a `find -exec` argv exec (plugin_api 24): the shell never
+-- sees the paths, so a directory name containing a quote or space cannot alter
+-- the command. The awk program arrives as a single argv element, so it needs no
+-- shell escaping either — only the in-awk string literals below.
 local M = {}
 
 local RESULT_LIMIT = 50
 local REFRESH_TTL_MS = 30000 -- 30s, matching v4's refreshTtl
 
 -- ── Pure logic (testable via __STEAM_TEST export) ──────────────────
-
--- Shell-quote a string: wrap in single quotes, escape embedded single quotes.
--- Used for paths from settings only (no user input).
-function M.shellQuote(s)
-  s = tostring(s or "")
-  return "'" .. s:gsub("'", "'\\''") .. "'"
-end
 
 -- Parse one `appid|name|iconPath` line → {appid, name, icon, isImage} or nil.
 -- Tail parts (icon path) are rejoined with | in the unlikely case a path
@@ -47,37 +46,79 @@ function M.parseScanOutput(stdout)
   return games
 end
 
--- Build the shell scan script. One `sh -c` pipeline emitting `appid|name|iconPath`
--- lines. Ported verbatim from v4 Main.qml refresh():
---   1. find appmanifest_*.acf
---   2. extract appid from filename, name via grep
---   3. filter *runtime*|*proton*|*redistributabl* (case-insensitive)
---   4. resolve first non-library_*.jpg from librarycache/<appid>/
+-- Extract the Steam appid from an appmanifest filename. Non-matching names
+-- (appmanifest_foo.acf, appmanifest_1a.acf) return nil so the caller can skip
+-- the entry rather than emit a bogus appid.
+function M.appidFromManifestPath(path)
+  return tostring(path or ""):match("appmanifest_(%d+)%.acf$")
+end
+
+-- The awk program run against every appmanifest, emitting `appid|name|iconPath`
+-- per game. Runs via `find … -exec awk '<program>' {} +`, i.e. once per batch of
+-- arguments. Ported from v4 Main.qml refresh(), preserving its filters and icon
+-- rule:
+--   1. appid from the filename
+--   2. name from the `name` key
+--   3. skip *runtime*|*proton*|*redistributabl* (case-insensitive)
+--   4. first non-library_*.jpg under librarycache/<appid>/
 --   5. emit appid|name|iconPath
-function M.buildScanScript(steamappsDir, librarycacheDir)
-  local qApps = M.shellQuote(steamappsDir)
-  local qCache = M.shellQuote(librarycacheDir)
+--
+-- Every rule is per-record and state resets on FNR==1, deliberately: with `{} +`
+-- batching one awk process reads the whole batch, so END fires *once for the
+-- batch* and would emit only the last file's game. (The earlier `-exec … {} \;`
+-- form fired END per file, which is why the END-based port worked before.) FNR==1
+-- resets per file; the emit therefore lives in the name rule, guarded by
+-- `emitted` so a second name= line cannot produce a duplicate row.
+--
+-- Two awk constructs are traps here, each of which silently kills the whole
+-- scan: `next` is a parse error inside an END action, and a POSIX class written
+-- as `[[:space:]]+` inside sub()'s replacement-adjacent regex is fine but the
+-- self-closing `[[:space:]]+` + `"` sequence is what the match rule must use
+-- verbatim. Keep the regexes below as they are and re-run the e2e test.
+function M.buildAwkProgram()
   return table.concat({
-    "set -e; ",
-    "STEAMAPPS=" .. qApps .. "; ",
-    "CACHE=" .. qCache .. "; ",
-    'for f in "$STEAMAPPS"/appmanifest_*.acf; do ',
-      '[ -f "$f" ] || continue; ',
-      'appid=$(basename "$f" | sed "s/^appmanifest_\\([0-9]*\\)\\.acf$/\\1/"); ',
-      '[ -n "$appid" ] || continue; ',
-      'name=$(grep -oE "\\"name\\"[[:space:]]+\\"[^\\"]*\\"" "$f" | head -1 | sed "s/^\\"name\\"[[:space:]]*\\"//; s/\\"$//"); ',
-      '[ -n "$name" ] || continue; ',
-      'lower=$(printf "%s" "$name" | tr "[:upper:]" "[:lower:]"); ',
-      'case "$lower" in ',
-        '*runtime*|*proton*|*redistributabl*) continue;; ',
-      'esac; ',
-      'icon=""; ',
-      'if [ -d "$CACHE/$appid" ]; then ',
-        'icon=$(find "$CACHE/$appid" -maxdepth 1 -type f -name "*.jpg" ! -name "library_*" 2>/dev/null | head -1); ',
-      'fi; ',
-      'printf "%s|%s|%s\\n" "$appid" "$name" "$icon"; ',
-    "done",
-  }, "")
+    "FNR==1 {",
+      'id=""; name=""; haveid=0; emitted=0;',
+      "if (split(FILENAME, parts, \"/\") > 0) {",
+        "base=parts[length(parts)];",
+        "if (match(base, /^appmanifest_[0-9]+\\.acf$/)) {",
+          -- "appmanifest_" is 12 chars, so the digits start at 13. The prefix is
+          -- fixed-length; the trailing ".acf" (4) is dropped from the length.
+          "id=substr(base, 13, length(base) - 16); haveid=1;",
+        "}",
+      "}",
+    "}",
+    'haveid && !emitted && /^[[:space:]]*"name"[[:space:]]+"/ {',
+      "n=$0;",
+      'sub(/^[[:space:]]*"name"[[:space:]]+"/, "", n);',
+      'sub(/"[[:space:]]*$/, "", n);',
+      "lower=tolower(n);",
+      "if (!(lower ~ /runtime/ || lower ~ /proton/ || lower ~ /redistributabl/)) {",
+        'icon="";',
+        'cmd="find \\"" CACHE "/" id "/\\" -maxdepth 1 -type f -name \\"*.jpg\\" ! -name \\"library_*\\" 2>/dev/null | head -1";',
+        "cmd | getline icon;",
+        "close(cmd);",
+        'printf "%s|%s|%s\\n", id, n, icon;',
+      "}",
+      "emitted=1;",
+    "}",
+  }, " ")
+end
+
+-- Build the scan argv. Direct exec (plugin_api 24) — no shell, so neither path
+-- is quoted or parsed; `find` receives them verbatim as argv elements, and the
+-- awk program reads the librarycache root from `-v CACHE=…` rather than a shell
+-- variable (the old `sh -c` form exported it). Without -v, CACHE expands to the
+-- empty string and every icon lookup silently finds nothing.
+function M.buildScanArgv(steamappsDir, librarycacheDir)
+  return {
+    "find", steamappsDir,
+    "-maxdepth", "1",
+    "-type", "f",
+    "-name", "appmanifest_*.acf",
+    "-exec", "awk", "-v", "CACHE=" .. librarycacheDir,
+    M.buildAwkProgram(), "{}", "+",
+  }
 end
 
 -- Format one game as a LauncherResult row.
@@ -160,11 +201,13 @@ function M._refresh(cfg, onDone)
     return
   end
   cache.loading = true
-  local script = M.buildScanScript(
+  -- The awk program reads the librarycache root from its environment; passing it
+  -- here keeps it out of the argv the shell would otherwise have to quote.
+  local argv = M.buildScanArgv(
     noctalia.expandPath(cfg.steamappsDir),
     noctalia.expandPath(cfg.librarycacheDir)
   )
-  noctalia.runAsync(script, function(res)
+  noctalia.runAsync(argv, function(res)
     cache.games = M.parseScanOutput(res and res.stdout or "")
     cache.loadedAt = nowMs()
     cache.loading = false
@@ -187,7 +230,7 @@ function M.onActivate(id)
     noctalia.notifyError("Steam Launcher", "steam command not found")
     return
   end
-  noctalia.runAsync("steam steam://rungameid/" .. appid, nil)
+  noctalia.runAsync({ "steam", "steam://rungameid/" .. appid })
 end
 
 if _G.__STEAM_TEST or noctalia == nil then return M end

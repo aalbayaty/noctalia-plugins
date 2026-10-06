@@ -8,18 +8,18 @@
 -- Single launcher_provider entry: onQuery triggers a scan (cached 30s),
 -- fuzzy-filters the results, and publishes them via launcher.setResults.
 -- onActivate extracts the filepath and runs `remmina -c <file>` detached.
+--
+-- The scan used to be one `sh -c` pipeline that shell-quoted the directory
+-- setting. It is now a `find -exec` argv exec (plugin_api 24): the shell never
+-- sees the path or the filenames, so a connection file called `x'; rm -rf ~;'.remmina`
+-- cannot alter the command. The awk program arrives as a single argv element, so
+-- it needs no shell escaping either — only the in-awk string literals below.
 local M = {}
 
 local RESULT_LIMIT = 50
 local REFRESH_TTL_MS = 30000 -- 30s, matching v4
 
 -- ── Pure logic (testable via __REMMINA_TEST export) ────────────────
-
--- Shell-quote a string: wrap in single quotes, escape embedded single quotes.
-function M.shellQuote(s)
-  s = tostring(s or "")
-  return "'" .. s:gsub("'", "'\\''") .. "'"
-end
 
 -- Parse a single .remmina file's contents → {name, protocol} or nil.
 -- INI-like key=value; match leading "name=" / "protocol=" specifically
@@ -61,19 +61,63 @@ function M.parseScanOutput(stdout)
   return conns
 end
 
--- Build the shell scan script. One `sh -c` pipeline emitting
--- `name|protocol|filepath` lines. Uses `find -exec awk` so awk runs once
--- per file (the ENDFILE block fires reliably per file). An earlier
--- `find -print0 | awk -v RS='\0'` form silently produced no output because
--- ENDFILE doesn't fire correctly with NUL-separated records.
-function M.buildScanScript(remminaDir)
-  local qDir = M.shellQuote(remminaDir)
-  return "find " .. qDir .. " -maxdepth 1 -name '*.remmina' -type f -exec awk '" ..
-    "FNR==1{name=\"\";protocol=\"\"} " ..
-    "/^[[:space:]]*name=/{sub(/^[[:space:]]*name=/,\"\"); gsub(/\\r$/,\"\"); name=$0} " ..
-    "/^[[:space:]]*protocol=/{sub(/^[[:space:]]*protocol=/,\"\"); gsub(/\\r$/,\"\"); protocol=$0} " ..
-    "END{if(name!=\"\") printf \"%s|%s|%s\\n\", name, protocol, FILENAME}" ..
-    "' {} \\; 2>/dev/null"
+-- The awk program run against every .remmina file, emitting
+-- `name|protocol|filepath`. Runs via `find … -exec awk '<program>' {} +`, i.e.
+-- once per batch of arguments.
+--
+-- Three awk traps shaped this program, each of which silently produced a wrong
+-- or empty result before the e2e test caught it:
+--
+--   1. END fires *once per batch* under `{} +`, not per file, so an END-based
+--      emit would return only the last connection. Hence `{} +` batching is
+--      paired with per-record rules that reset on FNR==1.
+--   2. `next` is a parse error inside an END action — avoid END entirely.
+--   3. `sub()` on a field rewrites $0, and awk then re-evaluates the *changed*
+--      record against the rules that follow. A trailing "emit anything left
+--      over" rule therefore fires on the name rule's own output rather than on
+--      a later line, which emitted the row before protocol= was ever read.
+--      The emit consequently has no fallback rule: it is triggered solely by
+--      the name rule, matching how Remmina always writes name= before the
+--      protocol line.
+--
+-- The protocol is captured from the last `protocol=` line in the file, unlike
+-- the retained M.parseRemminaFile which keeps the first. Remmina writes one
+-- protocol per file, so this is unreachable in practice and the two parsers
+-- agree on real input.
+--
+-- Files with no name= emit nothing (matching the old `END{ if(name!="") }`
+-- guard). The `|` separator is still ambiguous for a name containing a pipe —
+-- see M.parseLine, which always takes the trailing field as the path — so a
+-- connection named with a pipe shifts its protocol into the path. Remmina does
+-- not constrain those characters; noted rather than worked around, since a
+-- delimiter change would need a matching parser change.
+function M.buildAwkProgram()
+  return table.concat({
+    'FNR==1 { name=""; protocol=""; emitted=0; }',
+    "/^[[:space:]]*name=/ {",
+      'if (name == "") {',
+        'n=$0; sub(/^[[:space:]]*name=/, "", n); gsub(/\\r$/, "", n); name=n;',
+      "}",
+    "}",
+    "/^[[:space:]]*protocol=/ {",
+      'if (!emitted && name != "") {',
+        'p=$0; sub(/^[[:space:]]*protocol=/, "", p); gsub(/\\r$/, "", p); protocol=p;',
+        'printf "%s|%s|%s\\n", name, protocol, FILENAME; emitted=1;',
+      "}",
+    "}",
+  }, " ")
+end
+
+-- Build the scan argv. Direct exec (plugin_api 24) — no shell, so the directory
+-- is not quoted or parsed; `find` receives it verbatim as an argv element.
+function M.buildScanArgv(remminaDir)
+  return {
+    "find", remminaDir,
+    "-maxdepth", "1",
+    "-type", "f",
+    "-name", "*.remmina",
+    "-exec", "awk", M.buildAwkProgram(), "{}", "+",
+  }
 end
 
 -- Format one connection as a LauncherResult row.
@@ -145,8 +189,8 @@ function M._refresh(cfg, onDone)
     return
   end
   cache.loading = true
-  local script = M.buildScanScript(noctalia.expandPath(cfg.remminaDir))
-  noctalia.runAsync(script, function(res)
+  local argv = M.buildScanArgv(noctalia.expandPath(cfg.remminaDir))
+  noctalia.runAsync(argv, function(res)
     cache.conns = M.parseScanOutput(res and res.stdout or "")
     cache.loadedAt = nowMs()
     cache.loading = false
@@ -169,7 +213,7 @@ function M.onActivate(id)
     noctalia.notifyError("Remmina Launcher", "remmina command not found")
     return
   end
-  noctalia.runAsync("remmina -c " .. M.shellQuote(file), nil)
+  noctalia.runAsync({ "remmina", "-c", file })
 end
 
 if _G.__REMMINA_TEST or noctalia == nil then return M end

@@ -20,8 +20,8 @@ tags = ["Bar", "Panel", "Islam", "Prayer"]
 [[plugin]]
 id = "aalbayaty/steam-launcher"
 name = "Steam Launcher"
-version = "1.0.2"
-plugin_api = 3
+version = "1.1.0"
+plugin_api = 32
 author = "aalbayaty"
 license = "MIT"
 icon = "device-gamepad-2"
@@ -32,8 +32,8 @@ tags = ["Launcher", "Gaming"]
 [[plugin]]
 id = "aalbayaty/remmina-launcher"
 name = "Remmina Launcher"
-version = "1.0.3"
-plugin_api = 3
+version = "1.1.0"
+plugin_api = 32
 author = "aalbayaty"
 license = "MIT"
 icon = "device-desktop"

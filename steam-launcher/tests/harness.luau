@@ -15,8 +15,16 @@ H.noctalia = {
     return (tostring(p):gsub("^~", "/home/test"))
   end,
   runAsync = function(cmd, cb, ms)
+    -- Entries exec via argv arrays (plugin_api 24); keep a flat copy of every
+    -- command (table or string) so tests can assert on either form.
     H.calls.runAsync = H.calls.runAsync or {}
-    table.insert(H.calls.runAsync, cmd)
+    if type(cmd) == "table" then
+      local copy = {}
+      for i, v in ipairs(cmd) do copy[i] = v end
+      table.insert(H.calls.runAsync, copy)
+    else
+      table.insert(H.calls.runAsync, cmd)
+    end
     if H._runAsyncResult and cb then cb(H._runAsyncResult) end
     return true
   end,

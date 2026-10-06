@@ -1,7 +1,12 @@
 id = "aalbayaty/remmina-launcher"
 name = "Remmina Launcher"
-version = "1.0.3"
-plugin_api = 3
+version = "1.1.0"
+# Declares the newest API level (32, first shipped in Noctalia 5.2). The code
+# only needs 24: the argument-array form of runAsync (direct exec, no shell)
+# for both the scan and the launch, which with the `folder` setting type below
+# removes shell quoting entirely. API levels are cumulative, so declaring 32
+# drops every Noctalia older than 5.2; lower this back to 24 if that matters.
+plugin_api = 32
 min_noctalia = "5.0.0"
 author = "aalbayaty"
 license = "MIT"
@@ -31,7 +36,7 @@ debounce_ms = 100
 # top-level [[setting]], as in the official translator/kaomoji plugins).
 [[setting]]
 key = "remminaDir"
-type = "string"
+type = "folder"
 label_key = "settings.remminaDir.label"
 description_key = "settings.remminaDir.description"
 default = "~/.local/share/remmina"
