@@ -63,9 +63,10 @@ Browsers rather than Remote & Network:
 | Utilities | Utility |
 | Other | everything else |
 
-Columns are balanced by size: the largest groups are placed first, each into
-the shortest column, so the panel stays roughly even instead of following a
-fixed left-to-right group order.
+Columns are balanced by size: the groups are split so the columns are as close
+to equal height as possible, rather than following a fixed left-to-right group
+order. Within a column the groups keep the order above, and the columns are
+arranged by their first group, so Browsers still starts at the top left.
 
 ## Settings
 

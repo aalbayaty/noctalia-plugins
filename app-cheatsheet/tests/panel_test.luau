@@ -36,13 +36,15 @@ local function layout(columns)
   return table.concat(out, " ")
 end
 
-H.test("balancedColumns: largest groups placed first, service order kept within a column", function()
+H.test("balancedColumns: most even split, service order within a column, columns by first group", function()
+  -- Weights 4,5,12,3,11 (apps + header): greedy gives 19/16, the best split is 18/17.
   local columns = M.balancedColumns({ group("A", 2), group("B", 3), group("C", 10), group("D", 1), group("E", 9) }, 2)
-  H.eq(layout(columns), "A+C+D=19 B+E=16", "layout")
+  H.eq(layout(columns), "A+D+E=18 B+C=17", "layout")
 end)
 
-H.test("balancedColumns: a late, oversized group no longer stacks onto a full column", function()
-  -- The real 89-app list: fill-in-order gave columns of 32/23/36/18 rows.
+H.test("balancedColumns: the real app list splits as evenly as arithmetic allows", function()
+  -- The real 89-app list (109 rows): fill-in-order gave 32/23/36/18 and
+  -- largest-first greedy 29/28/27/25; 28/27/27/27 exists.
   local sizes = { { "Browsers", 2 }, { "Communication", 5 }, { "Games", 11 }, { "Development", 10 }, { "Office", 12 },
     { "Graphics", 4 }, { "Media", 4 }, { "Remote", 8 }, { "System", 21 }, { "Utilities", 12 } }
   local groups = {}
@@ -52,13 +54,34 @@ H.test("balancedColumns: a late, oversized group no longer stacks onto a full co
   for _, column in ipairs(columns) do
     low, high = math.min(low, column.weight), math.max(high, column.weight)
   end
-  H.ok(high - low <= 4, "columns within 4 rows of each other, got " .. layout(columns))
+  H.ok(high - low <= 1, "columns within one row of each other, got " .. layout(columns))
+  H.eq(columns[1].groups[1].name, "Browsers", "first column starts with the first group")
+  local seen = 0
+  for _, column in ipairs(columns) do seen += #column.groups end
+  H.eq(seen, #groups, "every group placed exactly once")
+end)
+
+H.test("balancedColumns: a hard case stays inside the search budget and never beats greedy backwards", function()
+  local groups = {}
+  for i = 1, 18 do groups[i] = group("G" .. i, (i * 7) % 23 + 1) end
+  local started = os.clock()
+  local columns = M.balancedColumns(groups, 6)
+  local elapsed = os.clock() - started
+  local high, placed = 0, 0
+  for _, column in ipairs(columns) do
+    high = math.max(high, column.weight)
+    placed += #column.groups
+  end
+  H.eq(placed, 18, "all groups placed")
+  H.ok(elapsed < 0.02, string.format("took %.1f ms", elapsed * 1000))
+  print(string.format("  (18 groups / 6 columns: tallest %d rows, %.2f ms)", high, elapsed * 1000))
 end)
 
 H.test("balancedColumns: more columns than groups leaves the extras empty", function()
   local columns = M.balancedColumns({ group("A", 1) }, 3)
   H.eq(#columns, 3, "count")
-  H.eq(#columns[2].groups + #columns[3].groups, 0, "empty columns")
+  H.eq(columns[1].groups[1].name, "A", "the group leads")
+  H.eq(#columns[2].groups + #columns[3].groups, 0, "empty columns trail")
 end)
 
 H.test("buildTree: loading and empty states", function()

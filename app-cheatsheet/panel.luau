@@ -22,36 +22,95 @@ function M.columnCount(configured, outputWidth)
   return math.min(wanted, fits)
 end
 
--- Balance by size: the largest groups are placed first, each into the
--- currently shortest column, which keeps column heights close even when one
--- group dwarfs the rest. Within a column the groups keep their service order
--- (custom groups first). A header counts as two rows.
-function M.balancedColumns(groups, count)
-  local columns = {}
-  for index = 1, count do columns[index] = { groups = {}, weight = 0 } end
+-- Search budget for balancedColumns. The exact search is exponential in the
+-- worst case and runs inside a render callback, so it stops after this many
+-- steps and keeps the best layout found (never worse than the greedy seed).
+local BALANCE_NODE_LIMIT = 20000
 
-  local bySize = {}
+-- Split the groups into `count` columns of as equal height as possible: the
+-- tallest column is made as short as it can be, then the shortest as tall as it
+-- can be. A header counts as two rows.
+--
+-- Largest-first greedy placement gives the starting layout; a depth-first
+-- search over the same order then looks for a better one, skipping branches
+-- that cannot beat the best so far and columns of equal height (they are
+-- interchangeable). Within a column the groups keep their service order
+-- (custom groups first), and columns are ordered by their first group, so the
+-- panel still reads Browsers-first from the top left.
+function M.balancedColumns(groups, count)
+  local items = {}
+  local total = 0
   for order, group in ipairs(groups) do
-    bySize[order] = { group = group, order = order, weight = #group.apps + 2 }
+    items[order] = { group = group, order = order, weight = #group.apps + 2 }
+    total += items[order].weight
   end
-  table.sort(bySize, function(a, b)
+  table.sort(items, function(a, b)
     if a.weight ~= b.weight then return a.weight > b.weight end
     return a.order < b.order
   end)
 
-  for _, item in ipairs(bySize) do
+  local load, assign, best = {}, {}, {}
+  for index = 1, count do load[index] = 0 end
+  for index, item in ipairs(items) do
     local target = 1
-    for index = 2, count do
-      if columns[index].weight < columns[target].weight then target = index end
+    for column = 2, count do
+      if load[column] < load[target] then target = column end
     end
-    table.insert(columns[target].groups, item)
-    columns[target].weight += item.weight
+    load[target] += item.weight
+    best[index] = target
   end
+  local bestMax, bestMin = math.max(table.unpack(load)), math.min(table.unpack(load))
 
+  -- Nothing can beat every column sitting at the average (rounded either way).
+  local idealSpread = total % count == 0 and 0 or 1
+  local nodes, done = 0, bestMax - bestMin <= idealSpread
+  for index = 1, count do load[index] = 0 end
+
+  local function search(index)
+    if done then return end
+    nodes += 1
+    if nodes > BALANCE_NODE_LIMIT then
+      done = true
+      return
+    end
+    if index > #items then
+      local highest, lowest = math.max(table.unpack(load)), math.min(table.unpack(load))
+      if highest < bestMax or (highest == bestMax and lowest > bestMin) then
+        bestMax, bestMin = highest, lowest
+        for i = 1, #items do best[i] = assign[i] end
+        if highest - lowest <= idealSpread then done = true end
+      end
+      return
+    end
+    local weight = items[index].weight
+    local tried = {}
+    for column = 1, count do
+      local current = load[column]
+      if not tried[current] and current + weight <= bestMax then
+        tried[current] = true
+        load[column] = current + weight
+        assign[index] = column
+        search(index + 1)
+        load[column] = current
+        if done then return end
+      end
+    end
+  end
+  if not done then search(1) end
+
+  local columns = {}
+  for index = 1, count do columns[index] = { groups = {}, weight = 0 } end
+  for index, item in ipairs(items) do
+    local column = columns[best[index]]
+    table.insert(column.groups, item)
+    column.weight += item.weight
+  end
   for _, column in ipairs(columns) do
     table.sort(column.groups, function(a, b) return a.order < b.order end)
+    column.first = column.groups[1] ~= nil and column.groups[1].order or math.huge
     for index, item in ipairs(column.groups) do column.groups[index] = item.group end
   end
+  table.sort(columns, function(a, b) return a.first < b.first end)
   return columns
 end
 
