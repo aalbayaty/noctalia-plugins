@@ -115,6 +115,14 @@ H.test("buildAwkProgram does not sub() over $0", function()
   H.ok(not p:find("sub%([^,]-%%,%s*\"\"%);%s*name%s*=%s*%$0", 1), "name not built via $0 sub")
   H.ok(p:find('n=%$0;', 1) or p:find("n=$0;", 1, true), "name goes through a temp var")
 end)
+H.test("buildAwkProgram emits regardless of name/protocol order", function()
+  -- Remmina VNC profiles write protocol= on the line *before* name=. Tying the
+  -- emit to the protocol rule dropped them; the emit must be its own rule that
+  -- fires once both are known.
+  local p = M.buildAwkProgram()
+  H.ok(p:find('!emitted && name != "" && protocol != "" {', 1, true), "standalone emit rule")
+  H.ok(not p:find('if (!emitted && name != "")', 1, true), "emit not nested in protocol rule")
+end)
 H.test("buildAwkProgram strips CRLF", function()
   local p = M.buildAwkProgram()
   H.ok(p:find("gsub%(/\\\\r$/", 1) or p:find("\\r$", 1, true), "CR stripped")

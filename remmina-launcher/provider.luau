@@ -73,17 +73,17 @@ end
 --      paired with per-record rules that reset on FNR==1.
 --   2. `next` is a parse error inside an END action — avoid END entirely.
 --   3. `sub()` on a field rewrites $0, and awk then re-evaluates the *changed*
---      record against the rules that follow. A trailing "emit anything left
---      over" rule therefore fires on the name rule's own output rather than on
---      a later line, which emitted the row before protocol= was ever read.
---      The emit consequently has no fallback rule: it is triggered solely by
---      the name rule, matching how Remmina always writes name= before the
---      protocol line.
+--      record against the rules that follow — so name and protocol are always
+--      extracted through temp vars (n, p), never by sub() over $0.
 --
--- The protocol is captured from the last `protocol=` line in the file, unlike
--- the retained M.parseRemminaFile which keeps the first. Remmina writes one
--- protocol per file, so this is unreachable in practice and the two parsers
--- agree on real input.
+-- Emission is order-independent: the final rule fires on whichever line
+-- completes the name+protocol pair. Remmina does not always write name= first
+-- — VNC profiles put protocol= on the line before name= — and an emit tied to
+-- the protocol rule silently dropped those connections.
+--
+-- The scan keeps the first protocol= in a file, unlike the retained
+-- M.parseRemminaFile which keeps the last. Remmina writes one protocol per
+-- file, so the two parsers agree on real input.
 --
 -- Files with no name= emit nothing (matching the old `END{ if(name!="") }`
 -- guard). The `|` separator is still ambiguous for a name containing a pipe —
@@ -100,10 +100,12 @@ function M.buildAwkProgram()
       "}",
     "}",
     "/^[[:space:]]*protocol=/ {",
-      'if (!emitted && name != "") {',
+      'if (protocol == "") {',
         'p=$0; sub(/^[[:space:]]*protocol=/, "", p); gsub(/\\r$/, "", p); protocol=p;',
-        'printf "%s|%s|%s\\n", name, protocol, FILENAME; emitted=1;',
       "}",
+    "}",
+    '!emitted && name != "" && protocol != "" {',
+      'printf "%s|%s|%s\\n", name, protocol, FILENAME; emitted=1;',
     "}",
   }, " ")
 end
